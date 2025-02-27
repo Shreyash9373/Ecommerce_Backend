@@ -5,9 +5,8 @@ import { cookieOptions } from "../constants.js";
 
 const genAccessAndRefreshTokens = async (userId) => {
   try {
-    console.log(userId);
     const user = await adminModel.findById(userId);
-    console.log(user);
+
     const accesstoken = user.generateAccessTokens();
     const refreshtoken = user.generateRefreshTokens();
 
