@@ -132,10 +132,11 @@ const loginVendor = asyncHandler(async (req, res) => {
 
   vendor.refreshToken = refreshtoken;
 
-  // Convert Mongoose document to a plain object and remove password
-  const vendorData = vendor.toObject();
-  delete vendorData.password;
-  console.log(vendorData); // check for refreshToken in user
+  const newVendor = await Vendor.findById(vendor._id).select(
+    "-password -refreshToken"
+  );
+
+  console.log(newVendor); // check for refreshToken in user
 
   // Set cookies with tokens
   const accessTokenOptions = cookieOptions("access");
@@ -149,7 +150,7 @@ const loginVendor = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         {
-          vendor: vendorData,
+          vendor: newVendor,
           accesstoken,
           refreshtoken,
         },
