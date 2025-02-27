@@ -5,6 +5,9 @@ dotenv.config({
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
+app.get("/", (req, res) => {
+  res.send("Api Working");
+});
 connectDB()
   .then(() => {
     app.listen(process.env.PORT || 8000, () => {

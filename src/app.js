@@ -16,9 +16,9 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 //Importing routes
-// import adminRoutes from "./routes/admin.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 //Routes declaration
-// app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 export { app };
