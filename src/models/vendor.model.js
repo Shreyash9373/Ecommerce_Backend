@@ -23,6 +23,8 @@ const VendorSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
+      default:
+        "https://res.cloudinary.com/smit110/image/upload/v1740310434/faoee0r7ueiywrq3dh45.jpg",
     },
 
     storeName: {
@@ -83,4 +85,41 @@ const VendorSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Vendor", VendorSchema);
+VendorSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+VendorSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
+
+VendorSchema.methods.generateAccessTokens = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+    }
+  );
+};
+
+VendorSchema.methods.generateRefreshTokens = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+    },
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    }
+  );
+};
+
+export const Vendor = mongoose.model("Vendor", VendorSchema);
