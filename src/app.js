@@ -3,10 +3,21 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 
 const app = express();
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+];
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true,
+    origin: (origin, callback) => {
+      if (allowedOrigins.includes(origin) || !origin) {
+        callback(null, true); //!origin allows requests from non-browser clients like postman
+      } else {
+        callback(new Error("Origin not allowed by CORS"));
+      }
+    },
+    credentials: true, //Allow cookies to be sent/received
   })
 );
 
@@ -20,7 +31,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
 
 //Routes declaration
-app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/admin", adminRoutes); //http://localhost:4000/api/v1/admin
 app.use("/api/v1/vendor", vendorRoutes); // http://localhost:4000/api/v1/vendor  /register  /login
 
 export { app };
