@@ -3,7 +3,7 @@ dotenv.config({
   path: "../.env",
 });
 import mongoose from "mongoose";
-import { loginModel } from "./models/login.model.js";
+import { adminModel } from "./models/admin.model.js";
 import connectDB from "./db/index.js";
 
 export const initialAdmin = async () => {
@@ -12,7 +12,7 @@ export const initialAdmin = async () => {
     await connectDB(); // Ensure this is awaited
 
     console.log(" Checking if admin user exists...");
-    const existingAdmin = await loginModel.findOne({
+    const existingAdmin = await adminModel.findOne({
       email: "admin@gmail.com",
     });
 
@@ -22,7 +22,7 @@ export const initialAdmin = async () => {
     }
 
     console.log(" Creating admin user...");
-    await loginModel.create({
+    await adminModel.create({
       email: "admin@gmail.com",
       password: process.env.adminPass, // Assuming password hashing is handled in the model
     });

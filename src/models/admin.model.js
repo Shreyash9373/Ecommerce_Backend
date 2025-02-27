@@ -82,4 +82,4 @@ adminSchema.methods.generateRefreshTokens = function () {
   );
 };
 
-export const adminModel = mongoose.model("admincredential", adminSchema);
+export const adminModel = mongoose.model("Admin", adminSchema);
