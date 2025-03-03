@@ -1,6 +1,8 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { adminModel } from "../models/admin.model.js";
+import { category } from "../models/category.model.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 import { cookieOptions } from "../constants.js";
 
 const genAccessAndRefreshTokens = async (userId) => {
@@ -65,4 +67,33 @@ const adminLoginController = asyncHandler(async (req, res) => {
     });
 });
 
-export { adminLoginController };
+const addCategory = asyncHandler(async (req, res) => {
+  const { name, slug, parentCategory, description, image, status } = req.body;
+
+  // Check if the category name or slug already exists
+  const existingCategory = await category.findOne({ name });
+  if (existingCategory) {
+    return res
+      .status(400)
+      .json({ message: "Category with this name already exists" });
+  }
+
+  // Create a new category
+  const newCategory = await category.create({
+    name,
+    slug: slug || "",
+    parentCategory: parentCategory || null, // If parentCategory is provided, it's a subcategory
+    description: description || "",
+    image: image || "",
+    status: status || "active",
+  });
+
+  // Save to database
+  // await newCategory.save();
+
+  // return res.status(201).json({ message: "Category added successfully", category: newCategory });
+  return res
+    .status(201)
+    .json(new ApiResponse(201, newCategory, "Category Added Successfully"));
+});
+export { adminLoginController, addCategory };
