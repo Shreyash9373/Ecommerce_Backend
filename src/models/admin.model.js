@@ -13,6 +13,20 @@ const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 const adminSchema = new mongoose.Schema({
+  user: {
+    type: String,
+    required: [true, "User is required"],
+  },
+  phone: {
+    type: Number,
+    required: true,
+  },
+  avatar: {
+    type: String,
+  },
+  lastLogin: {
+    type: Date,
+  },
   email: {
     type: String,
     required: [true, "Email is required"],
