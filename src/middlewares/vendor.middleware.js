@@ -1,9 +1,9 @@
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { adminModel } from "../models/admin.model.js";
+import { Vendor } from "../models/vendor.model.js";
 import jwt from "jsonwebtoken";
 
-const verifyJwtAdmin = asyncHandler(async (req, res, next) => {
+const verifyJwtVendor = asyncHandler(async (req, res, next) => {
   // try {
   const token =
     req.cookies?.accessToken ||
@@ -14,14 +14,14 @@ const verifyJwtAdmin = asyncHandler(async (req, res, next) => {
 
   const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-  const user = await adminModel
-    .findById(decodedToken?._id)
-    .select("-password -refreshToken");
+  const user = await Vendor.findById(decodedToken?._id).select(
+    "-password -refreshToken"
+  );
 
   if (!user) {
     throw new ApiError(401, "Invalid Access Token");
   }
-
+  console.log("user found");
   req.user = user;
   next();
   // } catch (error) {
@@ -35,4 +35,4 @@ const verifyJwtAdmin = asyncHandler(async (req, res, next) => {
   // }
 });
 
-export { verifyJwtAdmin };
+export { verifyJwtVendor };
