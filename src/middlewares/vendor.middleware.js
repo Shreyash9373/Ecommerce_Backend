@@ -21,7 +21,7 @@ const verifyJwtVendor = asyncHandler(async (req, res, next) => {
   if (!user) {
     throw new ApiError(401, "Invalid Access Token");
   }
-  console.log("user found");
+  // console.log("user found");
   req.user = user;
   next();
   // } catch (error) {

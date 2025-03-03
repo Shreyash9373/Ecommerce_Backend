@@ -33,7 +33,7 @@ import productRoutes from "./routes/product.routes.js";
 
 //Routes declaration
 app.use("/api/v1/admin", adminRoutes); //http://localhost:4000/api/v1/admin
-app.use("/api/v1/vendor", vendorRoutes); // http://localhost:4000/api/v1/vendor  /register  /login
+app.use("/api/v1/vendor", vendorRoutes); // http://localhost:4000/api/v1/vendor  /register  /login  /logout /get-vendor
 app.use("/api/v1/product", productRoutes); // http://localhost:4000/api/v1/product /add-Product
 
 export { app };
