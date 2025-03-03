@@ -24,7 +24,7 @@ const VendorSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default:
-        "https://res.cloudinary.com/smit110/image/upload/v1740310434/faoee0r7ueiywrq3dh45.jpg",
+        "https://res.cloudinary.com/shreyas9373/image/upload/v1740987014/defaultavatar_rr2iic.jpg",
     },
 
     storeName: {
