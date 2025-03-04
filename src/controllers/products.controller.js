@@ -120,4 +120,114 @@ const addProduct = asyncHandler(async (req, res) => {
   }
 });
 
-export { addProduct };
+const getAllProducts = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  try {
+    const products = await Product.find({ vendorId }); // Query products by vendorId
+    if (!products) {
+      throw new ApiError(400, "Failed to fetch Products");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, products, "Products fetched successfully!"));
+  } catch (error) {
+    throw new ApiError(500, error.message + "Error while fetching products");
+  }
+});
+
+const getProductById = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  //TODO: get product by id
+  if (!isValidObjectId(productId)) {
+    throw new ApiError(400, "Invalid Product id");
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { product }, "Product fetched successfully"));
+});
+
+const deleteProductById = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  //TODO: get product by id
+  if (!isValidObjectId(productId)) {
+    throw new ApiError(400, "Invalid Product id");
+  }
+
+  const product = await Product.findByIdAndDelete(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { product }, "Product deleted successfully"));
+});
+
+const updateProductById = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  if (!productId) {
+    throw new ApiError(400, "Failer to get productId");
+  }
+
+  try {
+    const updateData = req.body;
+
+    let uploadedImages = [];
+
+    if (req.files) {
+      // Upload product images (Multiple Files)
+      if (req.files.images) {
+        const imagesFiles = Array.isArray(req.files.images)
+          ? req.files.images
+          : [req.files.images]; // Ensure it's always an array
+
+        uploadedImages = await Promise.all(
+          imagesFiles.map(async (img) => {
+            const result = await uploadCloudinary(img.path, {
+              folder: "products",
+            });
+            return result.secure_url;
+          })
+        );
+      }
+    }
+
+    updateData.images = uploadedImages;
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedProduct) {
+      throw new ApiError(404, "Product not found");
+    }
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, updatedProduct, "Product updated successfully")
+      );
+  } catch (error) {
+    throw new ApiError(
+      500,
+      error.message || "Failed to update product details"
+    );
+  }
+});
+
+export {
+  addProduct,
+  getAllProducts,
+  getProductById,
+  deleteProductById,
+  updateProductById,
+};
