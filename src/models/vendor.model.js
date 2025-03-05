@@ -47,6 +47,9 @@ const VendorSchema = new mongoose.Schema(
       country: String,
       zipCode: String,
     },
+    refreshToken: {
+      type: String,
+    },
 
     verificationDocuments: [
       {
@@ -55,7 +58,7 @@ const VendorSchema = new mongoose.Schema(
     ],
     status: {
       type: String,
-      enum: ["pending", "approved", "suspended"],
+      enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
 
