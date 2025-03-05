@@ -4,8 +4,9 @@ import { adminModel } from "../models/admin.model.js";
 import { category } from "../models/category.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { cookieOptions } from "../constants.js";
-import { uploadCloudinary } from "../utils/cloudinary.js";
+import { uploadCloudinary, deleteInCloudinary } from "../utils/cloudinary.js";
 import { Product } from "../models/products.model.js";
+import { v2 as cloudinary } from "cloudinary";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -178,7 +179,7 @@ const deleteCategory = asyncHandler(async (req, res) => {
 
 const updateCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, slug, parentCategory, description, status } = req.body;
+  const updatedData = req.body;
   let image = req.file?.path;
   const Category = await category.findById(id);
   if (!Category) {
@@ -187,33 +188,26 @@ const updateCategory = asyncHandler(async (req, res) => {
 
   // Upload new image to Cloudinary if provided
   if (image) {
+    console.log("Image path: ", image);
     // Delete old image from Cloudinary if it exists
     if (Category.image) {
+      console.log("Old image: ", Category.image);
       const publicId = Category.image.split("/").pop().split(".")[0]; // Extract public ID
-      await cloudinary.v2.uploader.destroy(publicId); // Delete from Cloudinary
+      console.log("Public ID: ", publicId);
+      //await cloudinary.v2.uploader.destroy(publicId); // Delete from Cloudinary
+      const deletedResponse = await deleteInCloudinary(Category.image);
+      console.log("deletedres", deletedResponse);
     }
     const uploadResponse = await uploadCloudinary(image);
     image = uploadResponse.secure_url;
   }
-  // Category.name = name || Category.name;
-  // Category.slug = slug || Category.slug;
-  // Category.parentCategory = parentCategory || Category.parentCategory;
-  // Category.description = description || Category.description;
-  // Category.status = status || Category.status;
-  // if (image) Category.image = image; // Update image if changed
 
   // Save updated category
+  updatedData.image = image;
   const updatedCategory = await category.findByIdAndUpdate(
     id,
-    {
-      name: name || Category.name,
-      slug: slug || Category.slug,
-      parentCategory: parentCategory || Category.parentCategory,
-      description: description || Category.description,
-      status: status || Category.status,
-      image: image || Category.image,
-    },
-    { new: true } // Ensures you get the updated document in response
+    { $set: updatedData },
+    { new: true, runValidators: true } // Ensures you get the updated document in response
   );
 
   return res
