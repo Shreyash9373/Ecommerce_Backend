@@ -35,7 +35,12 @@ router.delete(
   verifyJwtAdmin,
   deleteAllSubCategories
 );
-router.put("/updateCategory/:id", verifyJwtAdmin, updateCategory);
+router.put(
+  "/updateCategory/:id",
+  verifyJwtAdmin,
+  upload.single("image"),
+  updateCategory
+);
 router.get("/getAllCategories", verifyJwtAdmin, getAllCategories);
 router.get("/getSingleCategory", verifyJwtAdmin, getSingleCategory);
 
