@@ -30,10 +30,12 @@ app.use(cookieParser());
 import adminRoutes from "./routes/admin.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
 import productRoutes from "./routes/product.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
 //Routes declaration
 app.use("/api/v1/admin", adminRoutes); //http://localhost:4000/api/v1/admin
 app.use("/api/v1/vendor", vendorRoutes); // http://localhost:4000/api/v1/vendor  /register  /login  /logout /get-vendor
-app.use("/api/v1/product", productRoutes); // http://localhost:4000/api/v1/product /add-Product
+app.use("/api/v1/product", productRoutes); // http://localhost:4000/api/v1/product /add-Product   /update-product/:productId   /getAll-Products   /get-product/:productId    /delete-product/:productId
+app.use("/api/v1/user", userRoutes); // http://localhost:4000/api/v1/user /register /login /logout /get-user /update-user
 
 export { app };
