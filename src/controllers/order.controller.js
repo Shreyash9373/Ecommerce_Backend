@@ -49,9 +49,9 @@ const createOrder = asyncHandler(async (req, res) => {
     const paymentStatus =
       paymentMethod == "Cash on Delivery" ? "Pending" : "Paid";
 
-    const newOrder = Order.create({
+    const newOrder = await Order.create({
       buyerId,
-      vendorId: vendorIds,
+      vendorId: [...vendorIds],
       items: orderItems,
       totalAmount,
       status: "Processing",
@@ -68,7 +68,7 @@ const createOrder = asyncHandler(async (req, res) => {
       .status(201)
       .json(new ApiResponse(201, newOrder, "Order Places Successfully"));
   } catch (error) {
-    throw new ApiError(400, "Erro while placing Order");
+    next(new ApiError(400, "Error while placing order"));
   }
 });
 
