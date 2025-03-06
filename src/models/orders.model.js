@@ -25,9 +25,9 @@ const OrderSchema = new mongoose.Schema(
           name: { type: String, required: true },
           price: { type: Number, required: true },
           vendorId: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor" },
-          description: String,
+          description: { type: String },
           images: [String], // If product has images
-          category: String,
+          category: { type: String },
         },
         quantity: {
           type: Number,
