@@ -7,6 +7,8 @@ import { cookieOptions } from "../constants.js";
 import { uploadCloudinary, deleteInCloudinary } from "../utils/cloudinary.js";
 import { Product } from "../models/products.model.js";
 import { v2 as cloudinary } from "cloudinary";
+import { Vendor } from "../models/vendor.model.js";
+import { User } from "../models/users.model.js";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -140,13 +142,13 @@ const deleteSubCategory = asyncHandler(async (req, res) => {
 });
 
 const deleteAllSubCategories = asyncHandler(async (req, res) => {
-  const { parent_id } = req.params;
-  const parentcat = await category.findById(parent_id);
+  const { id } = req.params;
+  const parentcat = await category.findById(id);
   if (!parentcat) {
     throw new ApiError(404, "Parent category not found");
   }
   const deletedSubCategories = await category.deleteMany({
-    parentCategory: parent_id,
+    parentCategory: id,
   });
   return res
     .status(200)
@@ -162,13 +164,13 @@ const deleteCategory = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Category not found");
   }
   // If the category has subcategories, prevent deletion
-  const subCategories = await Category.find({ parentCategory: id });
+  const subCategories = await category.find({ parentCategory: id });
   if (subCategories.length > 0) {
     throw new ApiError(400, "Category has subcategories. Delete them first");
   }
 
   // Delete category
-  const deletedCategory = await Category.findByIdAndDelete(id);
+  const deletedCategory = await category.findByIdAndDelete(id);
 
   return res
     .status(200)
@@ -318,6 +320,82 @@ const deleteProduct = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, deletedProduct, "Product deleted successfully"));
 });
+
+//Vendor Controllers
+const getAllVendors = asyncHandler(async (req, res) => {
+  const vendors = await Vendor.find({}).sort({ createdAt: -1 });
+  if (!vendors.length) {
+    throw new ApiError(404, "No vendors found");
+  }
+  res
+    .status(200)
+    .json(new ApiResponse(200, vendors, "All vendors fetched successfully"));
+});
+
+const approveVendor = asyncHandler(async (req, res) => {
+  const { vendorId } = req.params;
+
+  const upatedVendor = await Vendor.findByIdAndUpdate(
+    vendorId,
+    { status: "approved" },
+    { new: true }
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, upatedVendor, "Vendor approved successfully"));
+});
+const rejectVendor = asyncHandler(async (req, res) => {
+  const { vendorId } = req.params;
+
+  const upatedVendor = await Vendor.findByIdAndUpdate(
+    vendorId,
+    { status: "rejected" },
+    { new: true }
+  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, upatedVendor, "Vendor rejected successfully"));
+});
+
+const deleteVendor = asyncHandler(async (req, res) => {
+  const { vendorId } = req.params;
+  const vendor = await Vendor.findById(vendorId);
+
+  if (!vendor) {
+    throw new ApiError(404, "Vendor not found");
+  }
+
+  const deletedVendor = await Vendor.findByIdAndDelete(vendorId);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, deletedVendor, "Vendor deleted successfully"));
+});
+
+//User controllers
+
+const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find().select("-password");
+  if (!users.length) {
+    throw new ApiError(404, "No users found");
+  }
+  return res
+    .status(200)
+    .json(newApiResponse(200, users, "All users fetched successfully"));
+});
+
+const getUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const user = await User.findById(userId).select("-password");
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "User fetched successfully"));
+});
+
 export {
   adminLoginController,
   addCategory,
@@ -332,4 +410,10 @@ export {
   rejectProduct,
   getAllProducts,
   deleteProduct,
+  getAllVendors,
+  approveVendor,
+  rejectVendor,
+  deleteVendor,
+  getAllUsers,
+  getUser,
 };
