@@ -65,27 +65,42 @@ const registerVendor = asyncHandler(async (req, res) => {
     );
   }
 
-  let avatarLocalPath;
-  let avatar;
-  if (
-    req.files &&
-    Array.isArray(req.files.avatar) &&
-    req.files.avatar.length > 0
-  ) {
-    avatarLocalPath = req.files.avatar[0].path;
-  }
+  let avatarUrl;
+  let uploadedDocuments = [];
+  if (req.files) {
+    // Upload Avatar (Single Image)
+    if (req.files.avatar) {
+      const avatarLocalPath = Array.isArray(req.files.avatar)
+        ? req.files.avatar[0].path
+        : req.files.avatar.path;
+      const avatarUpload = await uploadCloudinary(avatarLocalPath, {
+        folder: "avatars",
+      });
+      avatarUrl = avatarUpload.secure_url;
+    }
 
-  if (avatarLocalPath) {
-    avatar = await uploadCloudinary(avatarLocalPath);
-    if (!avatar) {
-      throw new ApiError(500, "Failed to upload avatar image to Cloudinary");
+    // Upload Verification Documents (Multiple Files)
+    if (req.files.verificationDocuments) {
+      const documentFiles = Array.isArray(req.files.verificationDocuments)
+        ? req.files.verificationDocuments
+        : [req.files.verificationDocuments]; // Ensure it's always an array
+
+      uploadedDocuments = await Promise.all(
+        documentFiles.map(async (doc) => {
+          const result = await uploadCloudinary(doc.path, {
+            folder: "documents",
+          });
+          return result.secure_url;
+        })
+      );
     }
   }
 
   const vendor = await Vendor.create({
     email,
     password,
-    avatar: avatar?.url,
+    avatar: avatarUrl,
+    verificationDocuments: uploadedDocuments ? uploadedDocuments : null,
     name,
     phone,
     storeName,

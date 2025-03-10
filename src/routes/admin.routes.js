@@ -47,7 +47,7 @@ router.put(
   upload.single("image"),
   updateCategory
 );
-router.get("/getAllCategories", verifyJwtAdmin, getAllCategories);
+router.get("/getAllCategories", getAllCategories);
 router.get("/getSingleCategory", verifyJwtAdmin, getSingleCategory);
 
 //Product Routes
