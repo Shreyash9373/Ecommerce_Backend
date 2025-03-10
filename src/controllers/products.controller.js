@@ -24,7 +24,7 @@ const addProduct = asyncHandler(async (req, res) => {
       tags,
     } = req.body;
 
-    // console.log("Data received: ", req.body);
+    console.log("Data received: ", req.body);
 
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) {
@@ -33,30 +33,12 @@ const addProduct = asyncHandler(async (req, res) => {
 
     // console.log("vendor: ", vendor._id);
 
-    if (
-      [name, description, category, attributes, price, discount, stock].some(
-        (field) => field?.trim() === ""
-      )
-    ) {
-      throw new ApiError(400, "All fields are required");
-    }
-
-    // Ensure attributes, dimensions, and tags are properly parsed
-    let parsedAttributes, parsedDimensions, parsedTags;
-    try {
-      parsedAttributes = attributes ? JSON.parse(attributes) : null;
-      parsedDimensions = dimensions ? JSON.parse(dimensions) : null;
-      parsedTags = tags ? JSON.parse(tags) : [];
-    } catch (parseError) {
-      throw new ApiError(
-        400,
-        "Invalid JSON format in attributes/dimensions/tags"
-      );
-    }
-
-    // console.log("Parsed attributes: ", parsedAttributes);
-    // console.log("Parsed dimensions: ", parsedDimensions);
-    // console.log("Parsed tags: ", parsedTags);
+    // Parse attributes, dimensions, and tags if they're received as strings
+    const parsedAttributes =
+      typeof attributes === "string" ? JSON.parse(attributes) : attributes;
+    const parsedDimensions =
+      typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+    const parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags;
 
     // Calculate final price (price after discount)
     const finalPrice = discount
@@ -116,7 +98,7 @@ const addProduct = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, product, "Product added successfully"));
   } catch (error) {
     console.log("error: ", error);
-    throw new ApiError(400, "Error while adding Product");
+    throw new ApiError(400, error, "Error while adding Product");
   }
 });
 

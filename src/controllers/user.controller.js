@@ -9,10 +9,10 @@ import { User } from "../models/users.model.js";
 const genAccessAndRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
-    const accesstoken = vendor.generateAccessTokens();
-    const refreshtoken = vendor.generateRefreshTokens();
+    const accesstoken = user.generateAccessTokens();
+    const refreshtoken = user.generateRefreshTokens();
 
-    User.refreshToken = refreshtoken;
+    user.refreshToken = refreshtoken;
     await user.save({ validateBeforeSave: false });
 
     return { accesstoken, refreshtoken };
