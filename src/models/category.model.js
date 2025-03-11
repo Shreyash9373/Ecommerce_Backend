@@ -10,12 +10,12 @@ const categorySchema = new mongoose.Schema(
     },
     slug: {
       type: String,
-      unique: true,
     },
     parentCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      default: null, // NULL means it's a main category
+      // default: "67caca5fd5f5049461868e27", // NULL means it's a main category
+      default: null,
     },
     description: {
       type: String,

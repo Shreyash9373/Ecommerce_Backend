@@ -19,6 +19,9 @@ import {
   deleteVendor,
   getAllUsers,
   getUser,
+  getPendingVendors,
+  getApprovedVendors,
+  getRejectedVendors,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -59,6 +62,10 @@ router.delete("/deleteProduct/:productId", verifyJwtAdmin, deleteProduct);
 
 //Vendor Routes
 router.get("/getAllVendors", verifyJwtAdmin, getAllVendors);
+router.get("/getPendingVendors", verifyJwtAdmin, getPendingVendors);
+router.get("/getApprovedVendors", verifyJwtAdmin, getApprovedVendors);
+router.get("/getRejectedVendors", verifyJwtAdmin, getRejectedVendors);
+
 router.put("/approveVendor/:vendorId", verifyJwtAdmin, approveVendor);
 router.put("/rejectVendor/:vendorId", verifyJwtAdmin, rejectVendor);
 router.delete("/deleteVendor/:vendorId", verifyJwtAdmin, deleteVendor);
