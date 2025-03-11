@@ -24,7 +24,7 @@ const addProduct = asyncHandler(async (req, res) => {
       tags,
     } = req.body;
 
-    // console.log("Data received: ", req.body);
+    console.log("Data received: ", req.body);
 
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) {
@@ -33,30 +33,12 @@ const addProduct = asyncHandler(async (req, res) => {
 
     // console.log("vendor: ", vendor._id);
 
-    if (
-      [name, description, category, attributes, price, discount, stock].some(
-        (field) => field?.trim() === ""
-      )
-    ) {
-      throw new ApiError(400, "All fields are required");
-    }
-
-    // Ensure attributes, dimensions, and tags are properly parsed
-    let parsedAttributes, parsedDimensions, parsedTags;
-    try {
-      parsedAttributes = attributes ? JSON.parse(attributes) : null;
-      parsedDimensions = dimensions ? JSON.parse(dimensions) : null;
-      parsedTags = tags ? JSON.parse(tags) : [];
-    } catch (parseError) {
-      throw new ApiError(
-        400,
-        "Invalid JSON format in attributes/dimensions/tags"
-      );
-    }
-
-    // console.log("Parsed attributes: ", parsedAttributes);
-    // console.log("Parsed dimensions: ", parsedDimensions);
-    // console.log("Parsed tags: ", parsedTags);
+    // Parse attributes, dimensions, and tags if they're received as strings
+    const parsedAttributes =
+      typeof attributes === "string" ? JSON.parse(attributes) : attributes;
+    const parsedDimensions =
+      typeof dimensions === "string" ? JSON.parse(dimensions) : dimensions;
+    const parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags;
 
     // Calculate final price (price after discount)
     const finalPrice = discount
@@ -116,14 +98,29 @@ const addProduct = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, product, "Product added successfully"));
   } catch (error) {
     console.log("error: ", error);
-    throw new ApiError(400, "Error while adding Product");
+    throw new ApiError(400, error, "Error while adding Product");
   }
 });
 
-const getAllProducts = asyncHandler(async (req, res) => {
+const getAllVendorProducts = asyncHandler(async (req, res) => {
   const vendorId = req.user._id;
   try {
     const products = await Product.find({ vendorId }); // Query products by vendorId
+    if (!products) {
+      throw new ApiError(400, "Failed to fetch Products");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, products, "Products fetched successfully!"));
+  } catch (error) {
+    throw new ApiError(500, error.message + "Error while fetching products");
+  }
+});
+
+const getAllApprovedProducts = asyncHandler(async (req, res) => {
+  try {
+    const products = await Product.find({ status: "approved" }); // Query products by vendorId
     if (!products) {
       throw new ApiError(400, "Failed to fetch Products");
     }
@@ -173,11 +170,36 @@ const deleteProductById = asyncHandler(async (req, res) => {
 const updateProductById = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   if (!productId) {
+    console.log("Error in updateProductById :: cannot find productId");
     throw new ApiError(400, "Failer to get productId");
   }
 
   try {
     const updateData = req.body;
+
+    // Parse attributes safely
+    const parsedAttributes =
+      typeof updateData.attributes === "string"
+        ? JSON.parse(updateData.attributes)
+        : updateData.attributes || {};
+
+    // Parse dimensions safely
+    const parsedDimensions =
+      typeof updateData.dimensions === "string"
+        ? JSON.parse(updateData.dimensions)
+        : updateData.dimensions || {};
+
+    // Parse tags safely
+    const parsedTags =
+      typeof updateData.tags === "string"
+        ? JSON.parse(updateData.tags)
+        : updateData.tags || [];
+
+    updateData.attributes = parsedAttributes;
+    updateData.dimensions = parsedDimensions;
+    updateData.tags = parsedTags;
+
+    // console.log("Req.body : ", updateData);
 
     let uploadedImages = [];
 
@@ -208,6 +230,11 @@ const updateProductById = asyncHandler(async (req, res) => {
     );
 
     if (!updatedProduct) {
+      console.log(
+        "Error in updateProductById :: updatedProduct return error",
+        updatedProduct
+      );
+
       throw new ApiError(404, "Product not found");
     }
 
@@ -217,17 +244,16 @@ const updateProductById = asyncHandler(async (req, res) => {
         new ApiResponse(200, updatedProduct, "Product updated successfully")
       );
   } catch (error) {
-    throw new ApiError(
-      500,
-      error.message || "Failed to update product details"
-    );
+    console.log("Error in updateProductById :: error ", error);
+    throw new ApiError(500, error.message || "Failed to update product");
   }
 });
 
 export {
   addProduct,
-  getAllProducts,
+  getAllVendorProducts,
   getProductById,
   deleteProductById,
   updateProductById,
+  getAllApprovedProducts,
 };
