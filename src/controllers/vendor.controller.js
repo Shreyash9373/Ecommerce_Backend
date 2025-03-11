@@ -279,10 +279,30 @@ const updateVendorDetails = asyncHandler(async (req, res) => {
   }
 });
 
+const getVendorById = asyncHandler(async (req, res) => {
+  const { vendorId } = req.params;
+  //TODO: get product by id
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const vendor = await Vendor.findById(vendorId);
+  if (!vendor) {
+    throw new ApiError(404, "Vendor not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { vendor }, "Vendor details fetched successfully")
+    );
+});
+
 export {
   registerVendor,
   loginVendor,
   logoutVendor,
   getCurrentVendor,
   updateVendorDetails,
+  getVendorById,
 };

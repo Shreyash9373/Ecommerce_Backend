@@ -3,11 +3,13 @@ import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJwtVendor } from "../middlewares/vendor.middleware.js";
 import {
   addProduct,
-  getAllProducts,
+  getAllVendorProducts,
   getProductById,
   deleteProductById,
   updateProductById,
+  getAllApprovedProducts,
 } from "../controllers/products.controller.js";
+import { verifyJwtUser } from "../middlewares/user.middleware.js";
 
 const router = Router();
 
@@ -34,12 +36,14 @@ router.route("/update-product/:productId").put(
 );
 
 // secured routes
-router.route("/getAll-Products").get(verifyJwtVendor, getAllProducts);
+router.route("/getAll-Products").get(verifyJwtVendor, getAllVendorProducts);
 router.route("/get-product/:productId").get(verifyJwtVendor, getProductById);
+
+// Open route to get products for showing in main site
+router.route("/get-approvedProducts").get(getAllApprovedProducts);
+
 router
   .route("/delete-product/:productId")
   .delete(verifyJwtVendor, deleteProductById);
-// router.route("/logout").post(verifyJwtVendor, logoutUser);
-// router.route("/getUser").get(verifyJwtVendor, getCurrentUser);
 
 export default router;
