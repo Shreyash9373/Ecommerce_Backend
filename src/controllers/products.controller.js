@@ -102,10 +102,25 @@ const addProduct = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllProducts = asyncHandler(async (req, res) => {
+const getAllVendorProducts = asyncHandler(async (req, res) => {
   const vendorId = req.user._id;
   try {
     const products = await Product.find({ vendorId }); // Query products by vendorId
+    if (!products) {
+      throw new ApiError(400, "Failed to fetch Products");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, products, "Products fetched successfully!"));
+  } catch (error) {
+    throw new ApiError(500, error.message + "Error while fetching products");
+  }
+});
+
+const getAllApprovedProducts = asyncHandler(async (req, res) => {
+  try {
+    const products = await Product.find({ status: "approved" }); // Query products by vendorId
     if (!products) {
       throw new ApiError(400, "Failed to fetch Products");
     }
@@ -236,8 +251,9 @@ const updateProductById = asyncHandler(async (req, res) => {
 
 export {
   addProduct,
-  getAllProducts,
+  getAllVendorProducts,
   getProductById,
   deleteProductById,
   updateProductById,
+  getAllApprovedProducts,
 };
