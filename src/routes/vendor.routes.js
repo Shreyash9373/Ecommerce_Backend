@@ -31,7 +31,7 @@ router.route("/login").post(loginVendor);
 // secured routes
 router.route("/logout").post(verifyJwtVendor, logoutVendor);
 router.route("/get-vendor").get(verifyJwtVendor, getCurrentVendor);
-router.route("/get-vendorById/:vendorId").get(verifyJwtAdmin, getCurrentVendor);
+router.route("/get-vendorById/:vendorId").get(verifyJwtAdmin, getVendorById);
 
 router.route("/update-vendor").put(
   upload.fields([

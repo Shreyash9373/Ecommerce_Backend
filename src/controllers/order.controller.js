@@ -72,4 +72,23 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 });
 
-export { createOrder };
+const getVendorOrders = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  //TODO: get product by id
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const orders = await Order.find({ vendorId: vendorId });
+  if (!orders) {
+    throw new ApiError(404, "Vendor not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { orders }, "Vendor details fetched successfully")
+    );
+});
+
+export { createOrder, getVendorOrders };
