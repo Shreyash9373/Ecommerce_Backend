@@ -177,27 +177,44 @@ const updateProductById = asyncHandler(async (req, res) => {
   try {
     const updateData = req.body;
 
+    let parsedAttributes;
+    let parsedDimensions;
+    let parsedTags;
     // Parse attributes safely
-    const parsedAttributes =
-      typeof updateData.attributes === "string"
-        ? JSON.parse(updateData.attributes)
-        : updateData.attributes || {};
+    if (updateData.attributes) {
+      parsedAttributes =
+        typeof updateData.attributes === "string"
+          ? JSON.parse(updateData.attributes)
+          : updateData.attributes;
+    }
 
     // Parse dimensions safely
-    const parsedDimensions =
-      typeof updateData.dimensions === "string"
-        ? JSON.parse(updateData.dimensions)
-        : updateData.dimensions || {};
+    if (updateData.dimensions) {
+      parsedDimensions =
+        typeof updateData.dimensions === "string"
+          ? JSON.parse(updateData.dimensions)
+          : updateData.dimensions;
+    }
 
     // Parse tags safely
-    const parsedTags =
-      typeof updateData.tags === "string"
-        ? JSON.parse(updateData.tags)
-        : updateData.tags || [];
+    if (updateData.tags) {
+      parsedTags =
+        typeof updateData.tags === "string"
+          ? JSON.parse(updateData.tags)
+          : updateData.tags;
+    }
 
-    updateData.attributes = parsedAttributes;
-    updateData.dimensions = parsedDimensions;
-    updateData.tags = parsedTags;
+    if (parsedAttributes) {
+      updateData.attributes = parsedAttributes;
+    }
+
+    if (parsedDimensions) {
+      updateData.dimensions = parsedDimensions;
+    }
+
+    if (parsedTags) {
+      updateData.tags = parsedTags;
+    }
 
     // console.log("Req.body : ", updateData);
 
@@ -219,9 +236,8 @@ const updateProductById = asyncHandler(async (req, res) => {
           })
         );
       }
+      updateData.images = uploadedImages;
     }
-
-    updateData.images = uploadedImages;
 
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
