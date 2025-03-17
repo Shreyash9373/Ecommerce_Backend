@@ -281,6 +281,7 @@ const updateVendorDetails = asyncHandler(async (req, res) => {
 
 const getVendorById = asyncHandler(async (req, res) => {
   const { vendorId } = req.params;
+  console.log("Vendor id", vendorId);
   //TODO: get product by id
   if (!isValidObjectId(vendorId)) {
     throw new ApiError(400, "Invalid Vendor id");

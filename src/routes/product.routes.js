@@ -10,6 +10,7 @@ import {
   getAllApprovedProducts,
 } from "../controllers/products.controller.js";
 import { verifyJwtUser } from "../middlewares/user.middleware.js";
+import verifyJwtVendorOrAdmin from "../middlewares/adminorvendor.middleware.js";
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.route("/update-product/:productId").put(
 
 // secured routes
 router.route("/getAll-Products").get(verifyJwtVendor, getAllVendorProducts);
-router.route("/get-product/:productId").get(verifyJwtVendor, getProductById);
+router.route("/get-product/:productId").get(getProductById);
 
 // Open route to get products for showing in main site
 router.route("/get-approvedProducts").get(getAllApprovedProducts);

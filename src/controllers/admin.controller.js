@@ -74,6 +74,33 @@ const adminLoginController = asyncHandler(async (req, res) => {
     });
 });
 
+//logout Admin
+const logoutAdmin = asyncHandler(async (req, res) => {
+  const adminId = req.user._id;
+
+  await adminModel.findByIdAndUpdate(
+    adminId,
+    {
+      $unset: {
+        refreshToken: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  // Set cookies with tokens
+  const accessTokenOptions = cookieOptions("access");
+  const refreshTokenOptions = cookieOptions("refresh");
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", accessTokenOptions)
+    .clearCookie("refreshToken", refreshTokenOptions)
+    .json(new ApiResponse(200, {}, "Admin Logout Successfull"));
+});
+
 // •Category controllers
 
 const addCategory = asyncHandler(async (req, res) => {
@@ -252,7 +279,9 @@ const getAllCategories = asyncHandler(async (req, res) => {
 
 const getPendingVendors = asyncHandler(async (req, res) => {
   try {
-    const pendingVendors = await Vendor.find({ status: "pending" });
+    const pendingVendors = await Vendor.find({ status: "pending" }).sort({
+      createdAt: -1,
+    });
     res.status(200).json({
       success: true,
       count: pendingVendors.length,
@@ -265,7 +294,9 @@ const getPendingVendors = asyncHandler(async (req, res) => {
 
 const getApprovedVendors = asyncHandler(async (req, res) => {
   try {
-    const approvedVendors = await Vendor.find({ status: "approved" });
+    const approvedVendors = await Vendor.find({ status: "approved" }).sort({
+      createdAt: -1,
+    });
     res.status(200).json({
       success: true,
       count: approvedVendors.length,
@@ -278,7 +309,9 @@ const getApprovedVendors = asyncHandler(async (req, res) => {
 
 const getRejectedVendors = asyncHandler(async (req, res) => {
   try {
-    const rejectedVendors = await Vendor.find({ status: "rejected" });
+    const rejectedVendors = await Vendor.find({ status: "rejected" }).sort({
+      createdAt: -1,
+    });
     res.status(200).json({
       success: true,
       count: rejectedVendors.length,
@@ -317,6 +350,36 @@ const getPendingProducts = asyncHandler(async (req, res) => {
         200,
         pendingProducts,
         "Pending products fetched successfully"
+      )
+    );
+});
+const getApprovedProducts = asyncHandler(async (req, res) => {
+  const approvedProducts = await Product.find({ status: "approved" }).populate(
+    "vendorId",
+    "name"
+  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        approvedProducts,
+        "Approved products fetched successfully"
+      )
+    );
+});
+const getRejectedProducts = asyncHandler(async (req, res) => {
+  const rejectedProducts = await Product.find({ status: "rejected" }).populate(
+    "vendorId",
+    "name"
+  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        rejectedProducts,
+        "Rejected products fetched successfully"
       )
     );
 });
@@ -455,6 +518,7 @@ const getUser = asyncHandler(async (req, res) => {
 
 export {
   adminLoginController,
+  logoutAdmin,
   addCategory,
   deleteSubCategory,
   deleteAllSubCategories,
@@ -463,6 +527,8 @@ export {
   getAllCategories,
   getSingleCategory,
   getPendingProducts,
+  getApprovedProducts,
+  getRejectedProducts,
   approveProduct,
   rejectProduct,
   getAllProducts,
