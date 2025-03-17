@@ -74,11 +74,41 @@ const adminLoginController = asyncHandler(async (req, res) => {
     });
 });
 
+//logout Admin
+const logoutAdmin = asyncHandler(async (req, res) => {
+  const adminId = req.user._id;
+
+  await adminModel.findByIdAndUpdate(
+    adminId,
+    {
+      $unset: {
+        refreshToken: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  // Set cookies with tokens
+  const accessTokenOptions = cookieOptions("access");
+  const refreshTokenOptions = cookieOptions("refresh");
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", accessTokenOptions)
+    .clearCookie("refreshToken", refreshTokenOptions)
+    .json(new ApiResponse(200, {}, "Admin Logout Successfull"));
+});
+
 // •Category controllers
 
 const addCategory = asyncHandler(async (req, res) => {
-  const { name, slug, parentCategory, description, image, status } = req.body;
-
+  const { name, slug, parentCategory, description, status } = req.body;
+  console.log("Req.body: ", req.body);
+  if (parentCategory == null) {
+    parentCategory = "";
+  }
   // Check if the category name or slug already exists
   const existingCategory = await category.findOne({ name });
   if (existingCategory) {
@@ -182,10 +212,25 @@ const deleteCategory = asyncHandler(async (req, res) => {
 const updateCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const updatedData = req.body;
+  console.log("Updated Data", updatedData);
   let image = req.file?.path;
+  if (
+    updatedData.parentCategory == "null" ||
+    updatedData.parentCategory == ""
+  ) {
+    updatedData.parentCategory = null;
+  }
   const Category = await category.findById(id);
   if (!Category) {
     return res.status(404).json({ message: "Category not found" });
+  }
+  if (updatedData.slug) {
+    const existingCategory = await category.findOne({ slug: updatedData.slug });
+    if (existingCategory && existingCategory._id.toString() !== id) {
+      return res
+        .status(400)
+        .json({ message: "Slug already exists. Choose a different slug." });
+    }
   }
 
   // Upload new image to Cloudinary if provided
@@ -209,7 +254,7 @@ const updateCategory = asyncHandler(async (req, res) => {
   const updatedCategory = await category.findByIdAndUpdate(
     id,
     { $set: updatedData },
-    { new: true, runValidators: true } // Ensures you get the updated document in response
+    { new: true, runValidators: false } // Ensures you get the updated document in response
   );
 
   return res
@@ -230,6 +275,51 @@ const getAllCategories = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(200, categories, "All categories fetched successfully")
     );
+});
+
+const getPendingVendors = asyncHandler(async (req, res) => {
+  try {
+    const pendingVendors = await Vendor.find({ status: "pending" }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json({
+      success: true,
+      count: pendingVendors.length,
+      data: pendingVendors,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+const getApprovedVendors = asyncHandler(async (req, res) => {
+  try {
+    const approvedVendors = await Vendor.find({ status: "approved" }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json({
+      success: true,
+      count: approvedVendors.length,
+      data: approvedVendors,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+const getRejectedVendors = asyncHandler(async (req, res) => {
+  try {
+    const rejectedVendors = await Vendor.find({ status: "rejected" }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json({
+      success: true,
+      count: rejectedVendors.length,
+      data: rejectedVendors,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
 });
 
 const getSingleCategory = asyncHandler(async (req, res) => {
@@ -260,6 +350,36 @@ const getPendingProducts = asyncHandler(async (req, res) => {
         200,
         pendingProducts,
         "Pending products fetched successfully"
+      )
+    );
+});
+const getApprovedProducts = asyncHandler(async (req, res) => {
+  const approvedProducts = await Product.find({ status: "approved" }).populate(
+    "vendorId",
+    "name"
+  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        approvedProducts,
+        "Approved products fetched successfully"
+      )
+    );
+});
+const getRejectedProducts = asyncHandler(async (req, res) => {
+  const rejectedProducts = await Product.find({ status: "rejected" }).populate(
+    "vendorId",
+    "name"
+  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        rejectedProducts,
+        "Rejected products fetched successfully"
       )
     );
 });
@@ -398,6 +518,7 @@ const getUser = asyncHandler(async (req, res) => {
 
 export {
   adminLoginController,
+  logoutAdmin,
   addCategory,
   deleteSubCategory,
   deleteAllSubCategories,
@@ -406,6 +527,8 @@ export {
   getAllCategories,
   getSingleCategory,
   getPendingProducts,
+  getApprovedProducts,
+  getRejectedProducts,
   approveProduct,
   rejectProduct,
   getAllProducts,
@@ -416,4 +539,7 @@ export {
   deleteVendor,
   getAllUsers,
   getUser,
+  getPendingVendors,
+  getRejectedVendors,
+  getApprovedVendors,
 };

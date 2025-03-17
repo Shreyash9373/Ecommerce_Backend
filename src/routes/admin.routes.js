@@ -9,6 +9,8 @@ import {
   getAllCategories,
   getSingleCategory,
   getPendingProducts,
+  getApprovedProducts,
+  getRejectedProducts,
   approveProduct,
   rejectProduct,
   getAllProducts,
@@ -19,13 +21,18 @@ import {
   deleteVendor,
   getAllUsers,
   getUser,
+  getPendingVendors,
+  getApprovedVendors,
+  getRejectedVendors,
+  logoutAdmin,
 } from "../controllers/admin.controller.js";
-import { verifyJwtAdmin } from "../middlewares/auth.middleware.js";
+import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
 //Login route
 router.post("/login", adminLoginController);
+router.post("/logout", verifyJwtAdmin, logoutAdmin);
 
 //Category Routes
 router.post(
@@ -52,6 +59,8 @@ router.get("/getSingleCategory", verifyJwtAdmin, getSingleCategory);
 
 //Product Routes
 router.get("/getPendingProducts", verifyJwtAdmin, getPendingProducts);
+router.get("/getApprovedProducts", verifyJwtAdmin, getApprovedProducts);
+router.get("/getRejectedProducts", verifyJwtAdmin, getRejectedProducts);
 router.put("/approveProduct/:productId", verifyJwtAdmin, approveProduct);
 router.put("/rejectProduct/:productId", verifyJwtAdmin, rejectProduct);
 router.get("/getAllProducts", verifyJwtAdmin, getAllProducts);
@@ -59,6 +68,10 @@ router.delete("/deleteProduct/:productId", verifyJwtAdmin, deleteProduct);
 
 //Vendor Routes
 router.get("/getAllVendors", verifyJwtAdmin, getAllVendors);
+router.get("/getPendingVendors", verifyJwtAdmin, getPendingVendors);
+router.get("/getApprovedVendors", verifyJwtAdmin, getApprovedVendors);
+router.get("/getRejectedVendors", verifyJwtAdmin, getRejectedVendors);
+
 router.put("/approveVendor/:vendorId", verifyJwtAdmin, approveVendor);
 router.put("/rejectVendor/:vendorId", verifyJwtAdmin, rejectVendor);
 router.delete("/deleteVendor/:vendorId", verifyJwtAdmin, deleteVendor);
