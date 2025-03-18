@@ -299,6 +299,42 @@ const getVendorById = asyncHandler(async (req, res) => {
     );
 });
 
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, password, confirmPassword } = req.body;
+
+  if (!email || !password || !confirmPassword) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  if (password !== confirmPassword) {
+    throw new ApiError(400, "Password and Confirm Password do not match");
+  }
+
+  const vendor = await Vendor.findOne({ email });
+
+  if (!vendor) {
+    throw new ApiError(404, "Vendor does not exist");
+  }
+
+  // Set new password & save (Triggers pre-save hashing)
+  vendor.password = password;
+  await vendor.save();
+
+  // Remove sensitive fields before sending response
+  const sanitizedVendor = {
+    _id: vendor._id,
+    name: vendor.name,
+    email: vendor.email,
+    createdAt: vendor.createdAt,
+  };
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, sanitizedVendor, "Password Changed Successfully")
+    );
+});
+
 export {
   registerVendor,
   loginVendor,
@@ -306,4 +342,5 @@ export {
   getCurrentVendor,
   updateVendorDetails,
   getVendorById,
+  resetPassword,
 };

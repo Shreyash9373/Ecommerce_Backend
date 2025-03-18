@@ -97,7 +97,7 @@ const ProductSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "out-of-stock"],
+      enum: ["pending", "approved", "rejected", "unlisted", "out-of-stock"],
       default: "pending",
     },
     tags: [{ type: String }],
