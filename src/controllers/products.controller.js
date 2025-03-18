@@ -265,6 +265,72 @@ const updateProductById = asyncHandler(async (req, res) => {
   }
 });
 
+const searchProducts = asyncHandler(async (req, res) => {
+  let {
+    search,
+    category,
+    minPrice,
+    maxPrice,
+    sortBy,
+    limit = 10,
+    page = 1,
+  } = req.query;
+  const query = {};
+
+  // Search by name OR category (case-insensitive)
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { category: { $regex: search, $options: "i" } },
+      { subCategory: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  // Filter by category
+  if (category) {
+    query.category = category;
+  }
+
+  // Filter by price range
+  if (minPrice || maxPrice) {
+    query.price = {};
+    if (minPrice) query.price.$gte = parseFloat(minPrice);
+    if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+  }
+
+  // Sorting options
+  let sortOptions = {};
+  if (sortBy === "priceAsc") sortOptions.price = 1;
+  if (sortBy === "priceDesc") sortOptions.price = -1;
+  if (sortBy === "newest") sortOptions.createdAt = -1;
+
+  limit = parseInt(limit);
+  page = parseInt(page);
+  const skip = (page - 1) * limit;
+
+  // Fetch products
+  const products = await Product.find(query)
+    .sort(sortOptions)
+    .skip(skip)
+    .limit(limit);
+
+  // Get total product count
+  const totalProducts = await Product.countDocuments(query);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        totalProducts,
+        page,
+        totalPages: Math.ceil(totalProducts / limit),
+        products,
+      },
+      "Products fetched successfully"
+    )
+  );
+});
+
 export {
   addProduct,
   getAllVendorProducts,
@@ -272,4 +338,5 @@ export {
   deleteProductById,
   updateProductById,
   getAllApprovedProducts,
+  searchProducts,
 };

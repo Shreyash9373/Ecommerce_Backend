@@ -8,6 +8,7 @@ import {
   deleteProductById,
   updateProductById,
   getAllApprovedProducts,
+  searchProducts,
 } from "../controllers/products.controller.js";
 import { verifyJwtUser } from "../middlewares/user.middleware.js";
 import verifyJwtVendorOrAdmin from "../middlewares/adminorvendor.middleware.js";
@@ -39,6 +40,8 @@ router.route("/update-product/:productId").put(
 // secured routes
 router.route("/getAll-Products").get(verifyJwtVendor, getAllVendorProducts);
 router.route("/get-product/:productId").get(getProductById);
+
+router.route("/search-products").post(searchProducts);
 
 // Open route to get products for showing in main site
 router.route("/get-approvedProducts").get(getAllApprovedProducts);
