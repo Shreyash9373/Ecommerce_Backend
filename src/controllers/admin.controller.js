@@ -9,6 +9,7 @@ import { Product } from "../models/products.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import { Vendor } from "../models/vendor.model.js";
 import { User } from "../models/users.model.js";
+import sendEmail from "../utils/sendEmail.js";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -455,27 +456,60 @@ const getAllVendors = asyncHandler(async (req, res) => {
 const approveVendor = asyncHandler(async (req, res) => {
   const { vendorId } = req.params;
 
+  const vendor = await Vendor.findById(vendorId);
+  if (vendor.status === "approved") {
+    return res
+      .status(404)
+      .json(new ApiResponse(404, vendor, "Vendor is already approved"));
+  }
   const upatedVendor = await Vendor.findByIdAndUpdate(
     vendorId,
     { status: "approved" },
     { new: true }
   );
 
+  const loginLink = `${process.env.FRONTEND_URL}/login`;
+  const message = `Congratulations ${upatedVendor.name},\n\nYour vendor account has been approved. You can now login to your vendor dashboard using the link below:\n\n${loginLink}\n\nBest regards,\nEcommerce Team`;
+
+  await sendEmail(upatedVendor.email, "Vendor Account Approved", message);
+
   return res
     .status(200)
-    .json(new ApiResponse(200, upatedVendor, "Vendor approved successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        upatedVendor,
+        "Vendor approved successfully and mail sent"
+      )
+    );
 });
 const rejectVendor = asyncHandler(async (req, res) => {
   const { vendorId } = req.params;
+  const vendor = await Vendor.findById(vendorId);
+  if (vendor.status === "rejected") {
+    return res
+      .status(404)
+      .json(new ApiResponse(404, vendor, "Vendor is already rejected"));
+  }
 
   const upatedVendor = await Vendor.findByIdAndUpdate(
     vendorId,
     { status: "rejected" },
     { new: true }
   );
+
+  const message = `Sorry, ${upatedVendor.name},\n\nYour vendor account has been rejected. Please register again.\n\nBest regards,\nEcommerce Team`;
+
+  await sendEmail(upatedVendor.email, "Vendor Account Rejected", message);
   return res
     .status(200)
-    .json(new ApiResponse(200, upatedVendor, "Vendor rejected successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        upatedVendor,
+        "Vendor rejected successfully and email sent"
+      )
+    );
 });
 
 const deleteVendor = asyncHandler(async (req, res) => {
