@@ -25,6 +25,8 @@ import {
   getApprovedVendors,
   getRejectedVendors,
   logoutAdmin,
+  resetPassword,
+  getSearchVendor,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -33,6 +35,8 @@ const router = express.Router();
 //Login route
 router.post("/login", adminLoginController);
 router.post("/logout", verifyJwtAdmin, logoutAdmin);
+
+router.post("/reset-password", resetPassword);
 
 //Category Routes
 router.post(
@@ -75,6 +79,7 @@ router.get("/getRejectedVendors", verifyJwtAdmin, getRejectedVendors);
 router.put("/approveVendor/:vendorId", verifyJwtAdmin, approveVendor);
 router.put("/rejectVendor/:vendorId", verifyJwtAdmin, rejectVendor);
 router.delete("/deleteVendor/:vendorId", verifyJwtAdmin, deleteVendor);
+router.get("/getSearchVendor/", verifyJwtAdmin, getSearchVendor);
 
 //User Routes
 router.get("/getAllUsers", verifyJwtAdmin, getAllUsers);
