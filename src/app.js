@@ -8,6 +8,11 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://192.168.151.65:5173",
+  "http://147.93.30.210",
+  "https://peakpuneit.com",
+  "https://admin.peakpuneit.com",
+  "https://vendor.peakpuneit.com",
+  "https://api.peakpuneit.com",
 ];
 app.use(
   cors({
