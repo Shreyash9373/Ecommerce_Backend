@@ -75,6 +75,42 @@ const adminLoginController = asyncHandler(async (req, res) => {
     });
 });
 
+//Admin Password Reset
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, password, confirmPassword } = req.body;
+
+  if (!email || !password || !confirmPassword) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  if (password !== confirmPassword) {
+    throw new ApiError(400, "Password and Confirm Password do not match");
+  }
+
+  const admin = await adminModel.findOne({ email });
+
+  if (!admin) {
+    throw new ApiError(404, "Admin does not exist");
+  }
+
+  // Set new password & save (Triggers pre-save hashing)
+  admin.password = password;
+  await admin.save();
+
+  // Remove sensitive fields before sending response
+  const sanitizedVendor = {
+    _id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    createdAt: admin.createdAt,
+  };
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, sanitizedVendor, "Password Changed Successfully")
+    );
+});
 //logout Admin
 const logoutAdmin = asyncHandler(async (req, res) => {
   const adminId = req.user._id;
@@ -527,6 +563,42 @@ const deleteVendor = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, deletedVendor, "Vendor deleted successfully"));
 });
 
+const getSearchVendor = asyncHandler(async (req, res) => {
+  try {
+    const { search, status, page = 1, limit = 10 } = req.query; // ✅ Add search, pagination
+
+    const query = {};
+
+    // If status is provided, filter by status
+    if (status) query.status = status;
+
+    // If search is provided, filter vendors by name, email, or phone
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } }, // Case-insensitive search
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Implement Pagination
+    const vendors = await Vendor.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const totalVendors = await Vendor.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      totalVendors,
+      totalPages: Math.ceil(totalVendors / limit),
+      vendors,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 //User controllers
 
 const getAllUsers = asyncHandler(async (req, res) => {
@@ -536,7 +608,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
   }
   return res
     .status(200)
-    .json(newApiResponse(200, users, "All users fetched successfully"));
+    .json(new ApiResponse(200, users, "All users fetched successfully"));
 });
 
 const getUser = asyncHandler(async (req, res) => {
@@ -576,4 +648,6 @@ export {
   getPendingVendors,
   getRejectedVendors,
   getApprovedVendors,
+  getSearchVendor,
+  resetPassword,
 };
