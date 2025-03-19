@@ -1,5 +1,4 @@
 const DB_NAME = "Ecommerce";
-production = process.env.PRODUCTION;
 
 const cookieOptions = (tokenType) => {
   if (!["access", "refresh"].includes(tokenType)) {
@@ -8,8 +7,8 @@ const cookieOptions = (tokenType) => {
 
   return {
     httpOnly: true, // Ensures the cookie is only accessible via HTTP(S), not JavaScript
-    secure: production, // Sends cookie over HTTPS in production
-    sameSite: production ? "strict" : "lax", // Prevents CSRF attacks
+    secure: process.env.PRODUCTION, // Sends cookie over HTTPS in production
+    sameSite: process.env.PRODUCTION ? "strict" : "lax", // Prevents CSRF attacks
     // maxAge: maxAgeValues[tokenType], // Sets the expiration time based on the token type
   };
 };
