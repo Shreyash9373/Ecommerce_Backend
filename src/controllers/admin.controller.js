@@ -9,7 +9,8 @@ import { Product } from "../models/products.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import { Vendor } from "../models/vendor.model.js";
 import { User } from "../models/users.model.js";
-import sendEmail from "../utils/sendEmail.js";
+import { sendEmail, sendOtpEmail } from "../utils/sendEmail.js";
+import jwt from "jsonwebtoken";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -622,6 +623,58 @@ const getUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "User fetched successfully"));
 });
 
+const otpStorage = {};
+const sendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return new ApiError(404, "Email is required");
+  }
+
+  const otp = Math.floor(1000 + Math.random() * 900000).toString();
+  otpStorage[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
+  try {
+    await sendOtpEmail(email, otp);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Otp send successfully"));
+  } catch (error) {
+    console.log("Error", error);
+    return res
+      .status(500)
+      .json(new ApiResponse(500, null, "Failed to send otp"));
+  }
+});
+
+const verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!otpStorage[email]) {
+    return res.status(400).json({ error: "OTP expired or invalid" });
+  }
+
+  const storedOtp = otpStorage[email].otp;
+  const expiresAt = otpStorage[email].expiresAt;
+
+  if (Date.now() > expiresAt) {
+    delete otpStorage[email];
+    return res.status(400).json({ error: "OTP expired" });
+  }
+
+  if (storedOtp !== otp) {
+    return res.status(400).json({ error: "Invalid OTP" });
+  }
+
+  delete otpStorage[email];
+  const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+    expiresIn: "15m",
+  });
+
+  return res
+    .status(200)
+    .cookie("resetToken", token)
+    .json({ success: true, token, message: "Otp verified successfully" });
+});
+
 export {
   adminLoginController,
   logoutAdmin,
@@ -650,4 +703,6 @@ export {
   getApprovedVendors,
   getSearchVendor,
   resetPassword,
+  sendOtp,
+  verifyOtp,
 };
