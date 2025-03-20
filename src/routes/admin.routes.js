@@ -27,6 +27,8 @@ import {
   logoutAdmin,
   resetPassword,
   getSearchVendor,
+  sendOtp,
+  verifyOtp,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -84,5 +86,9 @@ router.get("/getSearchVendor/", verifyJwtAdmin, getSearchVendor);
 //User Routes
 router.get("/getAllUsers", verifyJwtAdmin, getAllUsers);
 router.get("/getUser/:userId", verifyJwtAdmin, getUser);
+
+//Email Authentication Routes for forgot password
+router.post("/sendOtp", sendOtp);
+router.post("/verifyOtp", verifyOtp);
 
 export default router;
