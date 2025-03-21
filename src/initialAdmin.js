@@ -24,7 +24,7 @@ export const initialAdmin = async () => {
 
     console.log(" Creating admin user...");
     await adminModel.create({
-      email: "admin@gmail.com",
+      email: "shreyashraut8@gmail.com",
       password: process.env.adminPass, // Assuming password hashing is handled in the model
       user: "Admin",
       phone: 9373180080,
