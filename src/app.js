@@ -13,7 +13,8 @@ const allowedOrigins = [
   "https://admin.peakpuneit.com",
   "https://vendor.peakpuneit.com",
   "https://api.peakpuneit.com",
-  "https://apiecom.pakharedentalclinic.com",
+  "https://adminecom.pakharedentalclinic.com",
+  "https://vendorecom.pakharedentalclinic.com",
 ];
 app.use(
   cors({
