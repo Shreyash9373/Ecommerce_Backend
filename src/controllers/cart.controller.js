@@ -67,12 +67,12 @@ const addItem = asyncHandler(async (req, res) => {
 
     try {
       const newCart = await cart.save();
-      console.log("Cart saved successfully:", newCart);
+      // console.log("Cart saved successfully:", newCart);
       return res
         .status(201)
         .json(new ApiResponse(201, newCart, "Item added successfully"));
     } catch (error) {
-      console.error("Error saving cart:", error);
+      // console.error("Error saving cart:", error);
       return next(new ApiError(500, "Failed to save cart"));
     }
   } catch (error) {
@@ -83,4 +83,93 @@ const addItem = asyncHandler(async (req, res) => {
   }
 });
 
-export { addItem };
+const getCart = asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    const cart = await Cart.findOne({ userId }).populate("items.productId");
+
+    if (!cart) {
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(200, { items: [], totalPrice: 0 }, "Cart is empty")
+        );
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Cart fetched successfully"));
+  } catch (error) {
+    console.error("Error fetching cart:", error);
+    return next(new ApiError(500, "Failed to get cart"));
+  }
+});
+
+const updateCartItem = asyncHandler(async (req, res, next) => {
+  try {
+    const { productId, quantity } = req.body;
+    const userId = req.user._id;
+
+    const parsedQuantity = Number(quantity);
+    if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      return next(new ApiError(400, "Invalid quantity value"));
+    }
+
+    let cart = await Cart.findOne({ userId });
+    if (!cart) {
+      return next(new ApiError(404, "Cart not found"));
+    }
+
+    const itemIndex = cart.items.findIndex((item) =>
+      item.productId.equals(productId)
+    );
+    if (itemIndex === -1) {
+      return next(new ApiError(404, "Product not found in cart"));
+    }
+
+    cart.items[itemIndex].quantity = parsedQuantity;
+
+    cart.totalPrice = cart.items.reduce(
+      (sum, item) => sum + item.quantity * item.productSnapshot.price,
+      0
+    );
+
+    await cart.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Cart updated successfully"));
+  } catch (error) {
+    console.error("Error updating cart:", error);
+    return next(new ApiError(500, "Failed to update cart"));
+  }
+});
+
+const removeItem = asyncHandler(async (req, res, next) => {
+  try {
+    const { productId } = req.body;
+    const userId = req.user._id;
+
+    let cart = await Cart.findOne({ userId });
+    if (!cart) {
+      return next(new ApiError(404, "Cart not found"));
+    }
+
+    cart.items = cart.items.filter((item) => !item.productId.equals(productId));
+
+    cart.totalPrice = cart.items.reduce(
+      (sum, item) => sum + item.quantity * item.productSnapshot.price,
+      0
+    );
+
+    await cart.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Item removed from cart"));
+  } catch (error) {
+    console.error("Error removing item:", error);
+    return next(new ApiError(500, "Failed to remove item from cart"));
+  }
+});
+
+export { addItem, getCart, updateCartItem, removeItem };
