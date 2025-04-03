@@ -14,7 +14,7 @@ const createOrder = asyncHandler(async (req, res) => {
     const { cartItems, paymentMethod, shippingAddress } = req.body;
 
     if (!cartItems || cartItems.length === 0) {
-      return res.status(400).json({ message: "Cart is empty" });
+      throw new ApiError(404, "Cart is empty");
     }
 
     let totalAmount = 0;
@@ -23,10 +23,9 @@ const createOrder = asyncHandler(async (req, res) => {
 
     for (const { productId, quantity } of cartItems) {
       const product = await Product.findById(productId).lean();
-      if (!product)
-        return res
-          .status(404)
-          .json({ message: `Product not found: ${productId}` });
+      if (!product) {
+        throw new ApiError(404, "Product not found");
+      }
 
       // Store full product details in order
       orderItems.push({
