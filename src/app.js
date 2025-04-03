@@ -39,6 +39,7 @@ import vendorRoutes from "./routes/vendor.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import orderRoutes from "./routes/order.routes.js";
+import cartRoutes from "./routes/cart.routes.js";
 
 //Routes declaration
 app.use("/api/v1/admin", adminRoutes); //http://localhost:4000/api/v1/admin
@@ -46,5 +47,6 @@ app.use("/api/v1/vendor", vendorRoutes); // http://localhost:4000/api/v1/vendor 
 app.use("/api/v1/product", productRoutes); // http://localhost:4000/api/v1/product /add-Product   /update-product/:productId   /getAll-Products   /get-product/:productId    /delete-product/:productId
 app.use("/api/v1/user", userRoutes); // http://localhost:4000/api/v1/user /register /login /logout /get-user /update-user
 app.use("/api/v1/order", orderRoutes); // http://localhost:4000/api/v1/order
+app.use("/api/v1/cart", cartRoutes); // http://localhost:4000/api/v1/cart   /add-Item
 
 export { app };
