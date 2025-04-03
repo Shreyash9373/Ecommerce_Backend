@@ -7,6 +7,7 @@ import {
   getCart,
   updateCartItem,
   removeItem,
+  clearCart,
 } from "../controllers/cart.controller.js";
 
 const router = Router();
@@ -18,5 +19,7 @@ router.route("/get-Cart").get(verifyJwtUser, getCart);
 router.route("/update-itemQuantity").put(verifyJwtUser, updateCartItem);
 
 router.route("/remove-Item").delete(verifyJwtUser, removeItem);
+
+router.route("/clear-Cart").delete(verifyJwtUser, clearCart);
 
 export default router;
