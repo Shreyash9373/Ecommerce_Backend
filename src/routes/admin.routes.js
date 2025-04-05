@@ -29,11 +29,16 @@ import {
   getSearchVendor,
   sendOtp,
   verifyOtp,
+  checkAuth,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
+
+//Authentication Route
+router.get("/checkAuth", checkAuth); //Check if accessToken is present or not
+
 //Login route
 router.post("/login", adminLoginController);
 router.post("/logout", verifyJwtAdmin, logoutAdmin);
