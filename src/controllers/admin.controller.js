@@ -33,6 +33,15 @@ const genAccessAndRefreshTokens = async (userId) => {
   }
 };
 
+//Admin authentication controller to check if accessToken is present or not
+const checkAuth = asyncHandler(async (req, res) => {
+  const accessToken = req.cookies.accessToken; // Access token from HttpOnly cookie
+  if (accessToken) {
+    return res.json({ isAuthenticated: true });
+  }
+  return res.json({ isAuthenticated: false });
+});
+
 //Admin login controller
 const adminLoginController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -748,7 +757,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
       message: "Sorry, I encountered an error processing your request.",
     };
   }
-  // const result = await chatSession.sendMessage(userQuery);
+  // const chatResponse = await chatSession.sendMessage(userQuery);
   // TODO: Following code needs to be updated for client-side apps.
   const candidates = result.response.candidates;
   // for (
@@ -776,13 +785,14 @@ const handleChatRequest = asyncHandler(async (req, res) => {
   //     }
   //   }
   // }
-  // console.log(result.response.text());
+  // console.log(chatResponse.response.text());
 
   // return res.status(200).json({ response: result.response.text() });
   return res.status(200).json({ response: parsedResponse });
 });
 
 export {
+  checkAuth,
   adminLoginController,
   logoutAdmin,
   addCategory,
