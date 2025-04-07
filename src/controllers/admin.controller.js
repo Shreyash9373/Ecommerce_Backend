@@ -730,9 +730,14 @@ const handleChatRequest = asyncHandler(async (req, res) => {
   console.log("Result", result.response);
   const responseText = result.response?.text();
   console.log("ResponseText", responseText);
+  const cleanText = responseText
+    .replace(/```json\s*/, "") // remove ```json (with optional whitespace)
+    .replace(/```/, "") // remove closing ```
+    .trim();
+  console.log("Cleantext", cleanText);
   let parsedResponse;
   try {
-    parsedResponse = JSON.parse(responseText);
+    parsedResponse = JSON.parse(cleanText);
     console.log("ParesedResponse", parsedResponse);
   } catch (error) {
     console.log("ParesedResponse", parsedResponse);
