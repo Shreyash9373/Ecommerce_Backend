@@ -11,6 +11,7 @@ import { Vendor } from "../models/vendor.model.js";
 import { User } from "../models/users.model.js";
 import { sendEmail, sendOtpEmail } from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -675,6 +676,107 @@ const verifyOtp = asyncHandler(async (req, res) => {
     .json({ success: true, token, message: "Otp verified successfully" });
 });
 
+//Chatbot controller
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from "@google/generative-ai";
+import fs from "node:fs";
+import mime from "mime-types";
+
+const handleChatRequest = asyncHandler(async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const userQuery = req.body.query;
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+  });
+  const prompt = `You are a helpful assistant for an ecommerce admin dashboard. 
+        Identify the user's intent from the following query based on these possible actions:
+        - show pending products
+        - show out-of-stock products
+        - create a new product
+        - edit product with ID [product_id]
+        - show recent orders
+        - search for orders by customer [customer_name]
+        - update inventory for product [product_sku]
+        - show user statistics
+        - help with [specific_feature]
+
+        If the intent matches one of these actions, respond with a JSON object in the format:
+        { "intent": "[identified_intent]", "parameters": { ... }, "message": "[user-friendly message]" }
+
+        If the intent is outside the scope of these actions, respond with:
+        { "intent": "unknown", "message": "Sorry, I can only help with tasks related to the admin dashboard." }
+
+        User query: "${userQuery}"`;
+  const generationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 40,
+    maxOutputTokens: 100,
+    responseModalities: [],
+    responseMimeType: "text/plain",
+  };
+
+  const chatSession = model.startChat({
+    generationConfig,
+    history: [],
+  });
+
+  const result = await model.generateContent(prompt);
+  console.log("Result", result.response);
+  const responseText = result.response?.text();
+  console.log("ResponseText", responseText);
+  let parsedResponse;
+  try {
+    parsedResponse = JSON.parse(responseText);
+    console.log("ParesedResponse", parsedResponse);
+  } catch (error) {
+    console.log("ParesedResponse", parsedResponse);
+
+    console.error("Error parsing Gemini response:", error, responseText);
+    parsedResponse = {
+      intent: "error",
+      message: "Sorry, I encountered an error processing your request.",
+    };
+  }
+  // const result = await chatSession.sendMessage(userQuery);
+  // TODO: Following code needs to be updated for client-side apps.
+  const candidates = result.response.candidates;
+  // for (
+  //   let candidate_index = 0;
+  //   candidate_index < candidates.length;
+  //   candidate_index++
+  // ) {
+  //   for (
+  //     let part_index = 0;
+  //     part_index < candidates[candidate_index].content.parts.length;
+  //     part_index++
+  //   ) {
+  //     const part = candidates[candidate_index].content.parts[part_index];
+  //     if (part.inlineData) {
+  //       try {
+  //         const filename = `output_${candidate_index}_${part_index}.${mime.extension(part.inlineData.mimeType)}`;
+  //         fs.writeFileSync(
+  //           filename,
+  //           Buffer.from(part.inlineData.data, "base64")
+  //         );
+  //         console.log(`Output written to: ${filename}`);
+  //       } catch (err) {
+  //         console.error(err);
+  //       }
+  //     }
+  //   }
+  // }
+  // console.log(result.response.text());
+
+  // return res.status(200).json({ response: result.response.text() });
+  return res.status(200).json({ response: parsedResponse });
+});
+
 export {
   adminLoginController,
   logoutAdmin,
@@ -705,4 +807,5 @@ export {
   resetPassword,
   sendOtp,
   verifyOtp,
+  handleChatRequest,
 };

@@ -29,6 +29,7 @@ import {
   getSearchVendor,
   sendOtp,
   verifyOtp,
+  handleChatRequest,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -90,5 +91,8 @@ router.get("/getUser/:userId", verifyJwtAdmin, getUser);
 //Email Authentication Routes for forgot password
 router.post("/sendOtp", sendOtp);
 router.post("/verifyOtp", verifyOtp);
+
+//Chatbot Routes
+router.post("/chat", verifyJwtAdmin, handleChatRequest);
 
 export default router;
