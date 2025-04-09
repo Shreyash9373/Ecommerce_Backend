@@ -41,6 +41,9 @@ const router = express.Router();
 //Authentication Route
 router.get("/checkAuth", checkAuth); //Check if accessToken is present or not
 
+//Authentication Route
+router.get("/checkAuth", checkAuth); //Check if accessToken is present or not
+
 //Login route
 router.post("/login", adminLoginController);
 router.post("/logout", verifyJwtAdmin, logoutAdmin);
