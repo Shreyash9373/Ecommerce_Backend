@@ -8,6 +8,7 @@ import { uploadCloudinary, deleteInCloudinary } from "../utils/cloudinary.js";
 import { Product } from "../models/products.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import { Vendor } from "../models/vendor.model.js";
+import { Order } from "../models/orders.model.js";
 import { User } from "../models/users.model.js";
 import { sendEmail, sendOtpEmail } from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken";
@@ -705,6 +706,11 @@ const handleChatRequest = asyncHandler(async (req, res) => {
   const prompt = `You are a helpful assistant for an ecommerce admin dashboard. 
         Identify the user's intent from the following query based on these possible actions:
         - show pending products
+        - show approved products
+        - show rejected products
+        - show pending vendors
+        - show approved vendors
+        - show rejected vendors
         - show out-of-stock products
         - create a new product
         - edit product with ID [product_id]
@@ -713,6 +719,12 @@ const handleChatRequest = asyncHandler(async (req, res) => {
         - update inventory for product [product_sku]
         - show user statistics
         - help with [specific_feature]
+
+         If the user's query is **ambiguous** (e.g., "show approved" or "show rejected") and it's not clear whether they are referring to products or vendors, respond with:
+{
+  "intent": "clarify",
+  "message": "Do you want to see approved products or approved vendors?"
+}
 
         If the intent matches one of these actions, respond with a JSON object in the format:
         { "intent": "[identified_intent]", "parameters": { ... }, "message": "[user-friendly message]" }
@@ -791,7 +803,60 @@ const handleChatRequest = asyncHandler(async (req, res) => {
   return res.status(200).json({ response: parsedResponse });
 });
 
+const getTopSellingProducts = asyncHandler(async (req, res) => {
+  const { range } = req.query; // 'week' or 'month'
+
+  let startDate;
+  const today = new Date();
+
+  if (range === "week") {
+    startDate = new Date(today.setDate(today.getDate() - 7));
+  } else if (range === "month") {
+    startDate = new Date(today.setMonth(today.getMonth() - 1));
+  } else {
+    return res.status(400).json({ message: "Invalid range" });
+  }
+
+  const topProducts = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate },
+        status: { $in: ["Delivered", "Completed"] }, // only completed orders
+      },
+    },
+    { $unwind: "$items" }, // deconstruct the array of items
+    {
+      $group: {
+        _id: "$items.productId",
+        totalSold: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "productInfo",
+      },
+    },
+    { $unwind: "$productInfo" },
+    {
+      $project: {
+        _id: 0,
+        productId: "$productInfo._id",
+        name: "$productInfo.name",
+        totalSold: 1,
+      },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  res.status(200).json({ topProducts });
+});
+
 export {
+  getTopSellingProducts,
   checkAuth,
   adminLoginController,
   logoutAdmin,

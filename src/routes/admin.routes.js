@@ -31,6 +31,7 @@ import {
   verifyOtp,
   handleChatRequest,
   checkAuth,
+  getTopSellingProducts,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -99,5 +100,6 @@ router.post("/verifyOtp", verifyOtp);
 
 //Chatbot Routes
 router.post("/chat", verifyJwtAdmin, handleChatRequest);
+router.post("/getTopSellingProducts", verifyJwtAdmin, getTopSellingProducts);
 
 export default router;
