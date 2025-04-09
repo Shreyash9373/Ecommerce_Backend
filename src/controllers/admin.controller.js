@@ -43,15 +43,6 @@ const checkAuth = asyncHandler(async (req, res) => {
   return res.json({ isAuthenticated: false });
 });
 
-//Admin authentication controller to check if accessToken is present or not
-const checkAuth = asyncHandler(async (req, res) => {
-  const accessToken = req.cookies.accessToken; // Access token from HttpOnly cookie
-  if (accessToken) {
-    return res.json({ isAuthenticated: true });
-  }
-  return res.json({ isAuthenticated: false });
-});
-
 //Admin login controller
 const adminLoginController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -864,7 +855,6 @@ const getTopSellingProducts = asyncHandler(async (req, res) => {
 export {
   checkAuth,
   getTopSellingProducts,
-  checkAuth,
   adminLoginController,
   logoutAdmin,
   addCategory,
