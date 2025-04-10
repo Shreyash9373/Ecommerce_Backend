@@ -105,6 +105,22 @@ const getOrderByStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
 });
 
+const getVendorOrderByStatus = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { status } = req.query;
+
+  // Use find() to get all products with the given status
+  const orders = await Order.find({ status: status, vendorId: vendorId });
+
+  if (!orders) {
+    throw new ApiError(404, "No orders found with this status");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
+});
+
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id, status } = req.body;
 
@@ -126,4 +142,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, order, "Order status updated"));
 });
 
-export { createOrder, getVendorOrders, getOrderByStatus, updateOrderStatus };
+export {
+  createOrder,
+  getVendorOrders,
+  getVendorOrderByStatus,
+  getOrderByStatus,
+  updateOrderStatus,
+};

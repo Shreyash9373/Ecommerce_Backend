@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadCloudinary } from "../utils/cloudinary.js";
 import { cookieOptions } from "../constants.js";
 import { Vendor } from "../models/vendor.model.js";
+import { Order } from "../models/orders.model.js";
 
 const genAccessAndRefreshTokens = async (vendorId) => {
   try {
@@ -335,6 +336,189 @@ const resetPassword = asyncHandler(async (req, res) => {
     );
 });
 
+// Dashboard Controllers
+
+const getMonthlySales = asyncHandler(async (req, res) => {
+  // Get total sales ( money ) of month
+
+  const vendorId = req.user._id;
+  const { month, year } = req.query;
+
+  // JavaScript months are 0-indexed (Jan = 0, Dec = 11)
+
+  //parse month and year
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  const startDate = new Date(yearNum, monthNum - 1, 1); // Start of month
+  const endDate = new Date(yearNum, monthNum, 1); // Start of next month
+
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const dailySales = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendorId,
+        createdAt: { $gte: startDate, $lt: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: { $dayOfMonth: "$createdAt" },
+        totalSales: { $sum: "$totalAmount" },
+      },
+    },
+    {
+      $sort: { _id: 1 },
+    },
+  ]);
+
+  const totalSalesAmount = dailySales.reduce(
+    (acc, day) => acc + day.totalSales,
+    0
+  );
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const labels = [];
+  const data = [];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const monthName = startDate.toLocaleString("default", { month: "short" });
+    labels.push(`${monthName} ${day}`);
+
+    const match = dailySales.find((d) => d._id === day);
+    data.push(match ? match.totalSales : 0);
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { totalSalesAmount, labels, data },
+        "Monthly Sales fetched successfully"
+      )
+    );
+});
+
+const getMonthlyUnitsSold = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { month, year } = req.query;
+
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  const startDate = new Date(yearNum, monthNum - 1, 1);
+  const endDate = new Date(yearNum, monthNum, 1);
+
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const dailyUnits = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendorId,
+        createdAt: { $gte: startDate, $lt: endDate },
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: { $dayOfMonth: "$createdAt" },
+        totalUnitsSold: { $sum: "$items.quantity" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const totalUnitsSold = dailyUnits.reduce(
+    (acc, day) => acc + day.totalUnitsSold,
+    0
+  );
+
+  const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+  const monthName = startDate.toLocaleString("default", { month: "short" });
+
+  const labels = [];
+  const data = [];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    labels.push(`${monthName} ${day}`);
+    const match = dailyUnits.find((d) => d._id === day);
+    data.push(match ? match.totalUnitsSold : 0);
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { totalUnitsSold, labels, data },
+        "Monthly units sold fetched successfully"
+      )
+    );
+});
+
+const getOrderStatus = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { month, year } = req.query;
+
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  const startDate = new Date(yearNum, monthNum - 1, 1); // Start of month
+  const endDate = new Date(yearNum, monthNum, 1); // Start of next month
+
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const orderStatus = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendorId,
+        createdAt: { $gte: startDate, $lt: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$count" },
+        statuses: {
+          $push: {
+            status: "$_id",
+            count: "$count",
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        total: "$total",
+        labels: "$statuses.status",
+        data: "$statuses.count",
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { orderStatus }, "Order Status fetched successfully")
+    );
+});
+
 export {
   registerVendor,
   loginVendor,
@@ -343,4 +527,9 @@ export {
   updateVendorDetails,
   getVendorById,
   resetPassword,
+
+  //Dashboard Routes
+  getMonthlySales,
+  getMonthlyUnitsSold,
+  getOrderStatus,
 };

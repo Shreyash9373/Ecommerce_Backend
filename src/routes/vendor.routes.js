@@ -10,6 +10,9 @@ import {
   updateVendorDetails,
   getVendorById,
   resetPassword,
+  getMonthlySales,
+  getMonthlyUnitsSold,
+  getOrderStatus,
 } from "../controllers/vendor.controller.js";
 
 const router = Router();
@@ -49,5 +52,13 @@ router.route("/update-vendor").put(
   verifyJwtVendor,
   updateVendorDetails
 );
+
+// Dashboard Routes
+
+router.route("/month-sales").get(verifyJwtVendor, getMonthlySales);
+
+router.route("/month-units").get(verifyJwtVendor, getMonthlyUnitsSold);
+
+router.route("/order-status").get(verifyJwtVendor, getOrderStatus);
 
 export default router;
