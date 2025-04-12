@@ -25,7 +25,7 @@ router.route("/register").post(
 router.route("/login").post(loginUser);
 
 // secured routes
-router.route("/logout").post(verifyJwtUser, logoutUser);
+router.post("/logout", logoutUser);
 router.route("/get-user").get(verifyJwtUser, getCurrentUser);
 
 router.route("/update-user").put(

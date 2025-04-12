@@ -117,61 +117,53 @@ const loginUser = asyncHandler(async (req, res) => {
   const refreshTokenOptions = cookieOptions("refresh");
 
   return res
-    .status(200)
-    .cookie("accessToken", accesstoken, accessTokenOptions)
-    .cookie("refreshToken", refreshtoken, refreshTokenOptions)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          user: newUser,
-          accesstoken,
-          refreshtoken,
-        },
-        "User logged-in successfully"
-      )
-    );
+  .status(200)
+  .cookie("accessToken", accesstoken, accessTokenOptions)
+  .cookie("refreshToken", refreshtoken, refreshTokenOptions)
+  .json({
+    success: true,
+    message: "User logged in successfully",
+    accessToken: accesstoken,
+    refreshToken: refreshtoken,
+    user: newUser,
+  });
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-  // get User from cookies
-  // clear cookies of user
+  try {
+    const accessTokenOptions = cookieOptions("access");
+    const refreshTokenOptions = cookieOptions("refresh");
 
-  const userId = req.user._id;
-
-  await User.findByIdAndUpdate(
-    userId,
-    {
-      $unset: {
-        refreshToken: 1,
-      },
-    },
-    {
-      new: true,
+    // If user exists, remove refresh token from DB
+    if (req.user && req.user._id) {
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { $unset: { refreshToken: 1 } },
+        { new: true }
+      );
     }
-  );
 
-  // Set cookies with tokens
-  const accessTokenOptions = cookieOptions("access");
-  const refreshTokenOptions = cookieOptions("refresh");
-
-  return res
-    .status(200)
-    .clearCookie("accessToken", accessTokenOptions)
-    .clearCookie("refreshToken", refreshTokenOptions)
-    .json(new ApiResponse(200, {}, "User Logout Successfull"));
+    // Clear cookies anyway
+    return res
+      .status(200)
+      .clearCookie("accessToken", accessTokenOptions)
+      .clearCookie("refreshToken", refreshTokenOptions)
+      .json(new ApiResponse(200, {}, "User Logout Successful"));
+  } catch (err) {
+    return res.status(200).json(new ApiResponse(200, {}, "User Logged Out (Silent)"));
+  }
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
   const user = req.user;
 
-  if (user) {
-    return res
-      .status(200)
-      .json(new ApiResponse(200, user, "Current Vendor Fetched Successfully"));
-  } else {
-    throw new ApiError(400, "Failed to fetch Vendor");
+  if (!user) {
+    throw new ApiError(400, "Failed to fetch user");
   }
+
+  return res.status(200).json(
+    new ApiResponse(200, user, "Current user fetched successfully")
+  );
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
