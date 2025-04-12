@@ -336,6 +336,44 @@ const resetPassword = asyncHandler(async (req, res) => {
     );
 });
 
+const earningOverview = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+
+  const summary = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendorId, // Automatically matches if vendorId is in the array
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalSalesAmount: { $sum: "$totalAmount" },
+        totalOrders: { $sum: 1 },
+        uniqueBuyers: { $addToSet: "$buyerId" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        totalSalesAmount: 1,
+        totalOrders: 1,
+        customerCount: { $size: "$uniqueBuyers" },
+      },
+    },
+  ]);
+
+  const result = summary[0] || {
+    totalSalesAmount: 0,
+    totalOrders: 0,
+    customerCount: 0,
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Earnings overview fetched "));
+});
+
 // Dashboard Controllers
 
 const getMonthlySales = asyncHandler(async (req, res) => {
@@ -527,6 +565,7 @@ export {
   updateVendorDetails,
   getVendorById,
   resetPassword,
+  earningOverview,
 
   //Dashboard Routes
   getMonthlySales,

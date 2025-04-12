@@ -10,6 +10,7 @@ import {
   updateVendorDetails,
   getVendorById,
   resetPassword,
+  earningOverview,
   getMonthlySales,
   getMonthlyUnitsSold,
   getOrderStatus,
@@ -52,6 +53,8 @@ router.route("/update-vendor").put(
   verifyJwtVendor,
   updateVendorDetails
 );
+
+router.route("/earning-overview").get(verifyJwtVendor, earningOverview);
 
 // Dashboard Routes
 
