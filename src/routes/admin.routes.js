@@ -32,14 +32,12 @@ import {
   handleChatRequest,
   checkAuth,
   getTopSellingProducts,
+  getDashboardStats,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = express.Router();
-
-//Authentication Route
-router.get("/checkAuth", checkAuth); //Check if accessToken is present or not
 
 //Authentication Route
 router.get("/checkAuth", checkAuth); //Check if accessToken is present or not
@@ -103,6 +101,9 @@ router.post("/verifyOtp", verifyOtp);
 
 //Chatbot Routes
 router.post("/chat", verifyJwtAdmin, handleChatRequest);
-router.post("/getTopSellingProducts", verifyJwtAdmin, getTopSellingProducts);
+router.get("/getTopSellingProducts", verifyJwtAdmin, getTopSellingProducts);
+
+//Dashboard Routes
+router.get("/getDashboardData", verifyJwtAdmin, getDashboardStats);
 
 export default router;

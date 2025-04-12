@@ -708,6 +708,8 @@ const handleChatRequest = asyncHandler(async (req, res) => {
         - show pending vendors
         - show approved vendors
         - show rejected vendors
+        - show top 5 selling products this week
+        - show top 5 selling products this month
         - show out-of-stock products
         - create a new product
         - edit product with ID [product_id]
@@ -724,7 +726,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
 }
 
         If the intent matches one of these actions, respond with a JSON object in the format:
-        { "intent": "[identified_intent]", "parameters": { ... }, "message": "[user-friendly message]" }
+        { "intent": "[identified_intent]", "parameters": {"range": "[week or month]" // If applicable, e.g. for top 5 selling products}, "message": "[user-friendly message]" }
 
         If the intent is outside the scope of these actions, respond with:
         { "intent": "unknown", "message": "Sorry, I can only help with tasks related to the admin dashboard." }
@@ -756,6 +758,13 @@ const handleChatRequest = asyncHandler(async (req, res) => {
   let parsedResponse;
   try {
     parsedResponse = JSON.parse(cleanText);
+    if (
+      /^show (top( 5)?)|(best selling)|(top selling) products/.test(
+        parsedResponse.intent?.toLowerCase()
+      )
+    ) {
+      parsedResponse.intent = "show top products";
+    }
     console.log("ParesedResponse", parsedResponse);
   } catch (error) {
     console.log("ParesedResponse", parsedResponse);
@@ -843,6 +852,7 @@ const getTopSellingProducts = asyncHandler(async (req, res) => {
         productId: "$productInfo._id",
         name: "$productInfo.name",
         totalSold: 1,
+        image: { $arrayElemAt: ["$productInfo.images", 0] },
       },
     },
     { $sort: { totalSold: -1 } },
@@ -852,8 +862,51 @@ const getTopSellingProducts = asyncHandler(async (req, res) => {
   res.status(200).json({ topProducts });
 });
 
+const getDashboardStats = asyncHandler(async (req, res) => {
+  // Total sales (from previous)
+  const salesResult = await Product.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalSold: { $sum: "$sold" },
+      },
+    },
+  ]);
+
+  const totalSales = salesResult.length > 0 ? salesResult[0].totalSold : 0;
+
+  // Total income
+  const incomeResult = await Product.aggregate([
+    {
+      $project: {
+        revenue: { $multiply: ["$finalPrice", "$sold"] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalIncome: { $sum: "$revenue" },
+      },
+    },
+  ]);
+
+  const totalIncome =
+    incomeResult.length > 0 ? Math.floor(incomeResult[0].totalIncome) : 0;
+
+  const totalPaidOrders = await Order.countDocuments({ paymentStatus: "Paid" });
+
+  return res.status(200).json({
+    success: true,
+    totalSales,
+    totalIncome,
+    totalPaidOrders,
+    message: "Dashboard stats fetched successfully",
+  });
+});
+
 export {
   checkAuth,
+  getDashboardStats,
   getTopSellingProducts,
   adminLoginController,
   logoutAdmin,

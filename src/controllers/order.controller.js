@@ -7,6 +7,7 @@ import { Vendor } from "../models/vendor.model.js";
 import { Order } from "../models/orders.model.js";
 import { Product } from "../models/products.model.js";
 import { User } from "../models/users.model.js";
+import { sendLowStockEmail } from "../utils/sendEmail.js";
 
 const createOrder = asyncHandler(async (req, res) => {
   try {
@@ -25,6 +26,27 @@ const createOrder = asyncHandler(async (req, res) => {
       const product = await Product.findById(productId).lean();
       if (!product) {
         throw new ApiError(404, "Product not found");
+      }
+
+      // ✅ Check if enough stock
+      if (product.stock < quantity) {
+        throw new ApiError(400, `Insufficient stock for ${product.name}`);
+      }
+
+      // ✅ Deduct stock
+      await Product.findByIdAndUpdate(productId, {
+        $inc: { stock: -quantity },
+      });
+
+      if (product.stock - quantity < 5) {
+        const product = await Product.findById(productId);
+        if (product && product.stock < 5) {
+          const vendor = await Vendor.findById(product.vendorId);
+          if (vendor && vendor.email) {
+            // Send email
+            await sendLowStockEmail(vendor.email, product.name, product.stock);
+          }
+        }
       }
 
       // Store full product details in order
