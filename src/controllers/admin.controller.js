@@ -719,11 +719,14 @@ const handleChatRequest = asyncHandler(async (req, res) => {
         - show user statistics
         - help with [specific_feature]
 
+
+
          If the user's query is **ambiguous** (e.g., "show approved" or "show rejected") and it's not clear whether they are referring to products or vendors, respond with:
 {
   "intent": "clarify",
   "message": "Do you want to see approved products or approved vendors?"
 }
+  
 
         If the intent matches one of these actions, respond with a JSON object in the format:
         { "intent": "[identified_intent]", "parameters": {"range": "[week or month]" // If applicable, e.g. for top 5 selling products}, "message": "[user-friendly message]" }
@@ -862,6 +865,68 @@ const getTopSellingProducts = asyncHandler(async (req, res) => {
   res.status(200).json({ topProducts });
 });
 
+const getTopVendors = asyncHandler(async (req, res) => {
+  const range = req.query.range || "week";
+  const now = new Date();
+  let startDate;
+
+  if (range === "month") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else {
+    // Default: past 7 days
+    startDate = new Date();
+    startDate.setDate(now.getDate() - 7);
+  }
+
+  const topVendors = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate },
+        status: { $in: ["Delivered", "Completed"] },
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.productSnapshot.vendorId",
+        totalSold: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $lookup: {
+        from: "vendors",
+        localField: "_id",
+        foreignField: "_id",
+        as: "vendorInfo",
+      },
+    },
+    { $unwind: "$vendorInfo" },
+    {
+      $project: {
+        vendorId: "$_id",
+        totalSold: 1,
+        name: "$vendorInfo.name",
+        avatar: "$vendorInfo.avatar",
+        storeName: "$vendorInfo.storeName",
+        email: "$vendorInfo.email",
+      },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    topVendors,
+  });
+});
+const getOutOfStockProducts = asyncHandler(async (req, res) => {
+  const products = await Product.find({ stock: 0, status: "approved" });
+  res.status(200).json({
+    success: true,
+    Products: products,
+  });
+});
 const getDashboardStats = asyncHandler(async (req, res) => {
   // Total sales (from previous)
   const salesResult = await Product.aggregate([
@@ -904,10 +969,100 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   });
 });
 
+// Utility to get date ranges
+// const getDateRange = (type) => {
+//   const now = new Date();
+//   let start, end;
+
+//   switch (type) {
+//     case "daily":
+//       start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+//       end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+//       break;
+
+//     case "weekly":
+//       const firstDayOfWeek = now.getDate() - now.getDay(); // Sunday
+//       start = new Date(now.getFullYear(), now.getMonth(), firstDayOfWeek);
+//       end = new Date(now.getFullYear(), now.getMonth(), firstDayOfWeek + 7);
+//       break;
+
+//     case "monthly":
+//       start = new Date(now.getFullYear(), now.getMonth(), 1);
+//       end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+//       break;
+
+//     case "yearly":
+//       start = new Date(now.getFullYear(), 0, 1);
+//       end = new Date(now.getFullYear() + 1, 0, 1);
+//       break;
+//   }
+
+//   return { $gte: start, $lt: end };
+// };
+
+const getSalesIncomeStats = asyncHandler(async (req, res) => {
+  const { type } = req.query; // 'weekly', 'monthly', 'yearly'
+  if (!type)
+    return res.status(400).json({ message: "Time range is required." });
+
+  const now = new Date();
+  let groupId = {};
+  let start;
+
+  if (type === "weekly") {
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    start = startOfWeek;
+    groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday, 7 = Saturday
+  } else if (type === "monthly") {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    groupId = { $month: "$createdAt" }; // 1 to 31
+  } else if (type === "yearly") {
+    const startYear = now.getFullYear() - 2;
+    const endYear = now.getFullYear() + 2;
+
+    // Start from Jan 1st of (current year - 2)
+    start = new Date(startYear, 0, 1);
+
+    groupId = { $year: "$createdAt" }; // 👈 Group by year
+  }
+
+  const matchStage = {
+    createdAt: { $gte: start },
+    status: { $in: ["Delivered", "Completed"] },
+    paymentStatus: "Paid",
+  };
+
+  const aggregation = [
+    { $match: matchStage },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: groupId,
+        sales: { $sum: "$items.quantity" },
+        income: {
+          $sum: {
+            $multiply: ["$items.quantity", "$items.productSnapshot.price"],
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
+
+  const results = await Order.aggregate(aggregation);
+
+  return res.status(200).json({ success: true, data: results });
+});
+
 export {
+  getSalesIncomeStats,
+  getOutOfStockProducts,
   checkAuth,
   getDashboardStats,
   getTopSellingProducts,
+  getTopVendors,
   adminLoginController,
   logoutAdmin,
   addCategory,

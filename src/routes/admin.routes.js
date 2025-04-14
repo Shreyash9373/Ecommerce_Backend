@@ -33,6 +33,9 @@ import {
   checkAuth,
   getTopSellingProducts,
   getDashboardStats,
+  getTopVendors,
+  getOutOfStockProducts,
+  getSalesIncomeStats,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -102,8 +105,11 @@ router.post("/verifyOtp", verifyOtp);
 //Chatbot Routes
 router.post("/chat", verifyJwtAdmin, handleChatRequest);
 router.get("/getTopSellingProducts", verifyJwtAdmin, getTopSellingProducts);
+router.get("/getTopVendors", verifyJwtAdmin, getTopVendors);
+router.get("/getOutOfStockProducts", verifyJwtAdmin, getOutOfStockProducts);
 
 //Dashboard Routes
 router.get("/getDashboardData", verifyJwtAdmin, getDashboardStats);
+router.get("/getSalesIncomeStats", verifyJwtAdmin, getSalesIncomeStats);
 
 export default router;
