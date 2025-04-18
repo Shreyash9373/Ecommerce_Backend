@@ -146,7 +146,12 @@ const loginVendor = asyncHandler(async (req, res) => {
     vendor._id
   );
 
+  // Update refreshToken and lastLogin
   vendor.refreshToken = refreshtoken;
+  vendor.lastLogin = new Date();
+
+  // save updated vendor info
+  await vendor.save();
 
   const newVendor = await Vendor.findById(vendor._id).select(
     "-password -refreshToken"
@@ -557,6 +562,279 @@ const getOrderStatus = asyncHandler(async (req, res) => {
     );
 });
 
+const vendorInsights = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { month, year } = req.query;
+
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  const startDate = new Date(yearNum, monthNum - 1, 1);
+  const endDate = new Date(yearNum, monthNum, 1);
+
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  const insightsPipeline = [
+    {
+      $match: {
+        vendorId: vendorId,
+        createdAt: { $gte: startDate, $lt: endDate },
+      },
+    },
+    {
+      $facet: {
+        totalOrdersAndRevenue: [
+          {
+            $group: {
+              _id: null,
+              totalOrders: { $sum: 1 },
+              totalRevenue: { $sum: "$totalAmount" },
+            },
+          },
+        ],
+        unitsSold: [
+          { $unwind: "$items" },
+          {
+            $group: {
+              _id: null,
+              unitsSold: { $sum: "$items.quantity" },
+            },
+          },
+        ],
+        newCustomers: [
+          {
+            $group: {
+              _id: "$buyerId",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              customerCount: { $sum: 1 },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        totalOrders: {
+          $ifNull: [
+            { $arrayElemAt: ["$totalOrdersAndRevenue.totalOrders", 0] },
+            0,
+          ],
+        },
+        totalRevenue: {
+          $ifNull: [
+            { $arrayElemAt: ["$totalOrdersAndRevenue.totalRevenue", 0] },
+            0,
+          ],
+        },
+        unitsSold: {
+          $ifNull: [{ $arrayElemAt: ["$unitsSold.unitsSold", 0] }, 0],
+        },
+        newCustomers: {
+          $ifNull: [{ $arrayElemAt: ["$newCustomers.customerCount", 0] }, 0],
+        },
+      },
+    },
+    {
+      $addFields: {
+        averageOrderValue: {
+          $cond: [
+            { $eq: ["$totalOrders", 0] },
+            0,
+            { $divide: ["$totalRevenue", "$totalOrders"] },
+          ],
+        },
+      },
+    },
+  ];
+
+  const [insights] = await Order.aggregate(insightsPipeline);
+  const vendor = await Vendor.findById(vendorId);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        lastLogin: vendor?.lastLogin || null,
+        totalOrders: insights?.totalOrders || 0,
+        totalRevenue: insights?.totalRevenue || 0,
+        unitsSold: insights?.unitsSold || 0,
+        newCustomers: insights?.newCustomers || 0,
+        averageOrderValue: insights?.averageOrderValue || 0,
+      },
+      "Vendor insights fetched successfully"
+    )
+  );
+});
+
+const getCustomerOrderTrends = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { month, year } = req.query;
+
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  if (isNaN(monthNum) || isNaN(yearNum)) {
+    return res.status(400).json({ message: "Invalid month or year" });
+  }
+
+  const endDate = new Date(yearNum, monthNum, 1);
+  const startDate = new Date(yearNum, monthNum - 4, 1);
+
+  const trends = await Order.aggregate([
+    {
+      $match: {
+        vendorId,
+        createdAt: { $gte: startDate, $lt: endDate },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          month: { $month: "$createdAt" },
+          year: { $year: "$createdAt" },
+        },
+        orderCount: { $sum: 1 },
+        customerIds: { $addToSet: "$buyerId" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        month: "$_id.month",
+        year: "$_id.year",
+        orderCount: 1,
+        customerCount: { $size: "$customerIds" },
+      },
+    },
+    { $sort: { year: 1, month: 1 } },
+  ]);
+
+  // Format months for labels like "Jan 2025"
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+
+  const labels = trends.map(({ month, year }) =>
+    formatter.format(new Date(year, month - 1))
+  );
+
+  const orders = trends.map((t) => t.orderCount);
+  const customers = trends.map((t) => t.customerCount);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+
+      {
+        labels,
+        orders,
+        customers,
+      },
+
+      "Orders-Customers fetched successfully"
+    )
+  );
+});
+
+const getBestProducts = async (req, res) => {
+  try {
+    const vendorId = req.user._id; // Authenticated vendor
+    const { month, year } = req.query;
+
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+
+    const startDate = new Date(yearNum, monthNum - 1, 1);
+    const endDate = new Date(yearNum, monthNum, 1);
+
+    // Match vendor's orders in the selected month/year
+    const pipeline = [
+      {
+        $match: {
+          vendorId: { $in: [vendorId] }, // Make sure this is the correct vendorId you're matching
+          createdAt: { $gte: startDate, $lt: endDate },
+          status: { $in: ["Delivered", "Completed"] }, // Filter completed or delivered orders
+        },
+      },
+      {
+        $unwind: "$items", // Unwind the items array to deal with each item separately
+      },
+      {
+        $match: {
+          "items.productSnapshot.vendorId": { $in: [vendorId] }, // Make sure we're only looking at the correct vendor's products
+        },
+      },
+      {
+        $group: {
+          _id: "$items.productId", // Group by productId
+          totalUnitsSold: { $sum: "$items.quantity" }, // Sum of quantity for each product
+          totalRevenue: {
+            $sum: {
+              $multiply: [
+                "$items.quantity", // Quantity of each item
+                "$items.productSnapshot.price", // Price from productSnapshot
+              ],
+            },
+          },
+          averageRating: { $avg: "$items.productSnapshot.rating" }, // Calculate average rating from productSnapshot
+        },
+      },
+      {
+        $sort: { totalUnitsSold: -1 }, // Sort by totalUnitsSold in descending order
+      },
+      {
+        $limit: 5, // Limit to the top 5 products
+      },
+      {
+        $lookup: {
+          from: "products", // Lookup the details from the 'products' collection
+          localField: "_id",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      {
+        $unwind: "$productDetails", // Unwind the product details for each matched product
+      },
+      {
+        $project: {
+          _id: 0,
+          productId: "$productDetails._id",
+          name: "$productDetails.name",
+          image: "$productDetails.images", // Image of the product
+          totalUnitsSold: 1,
+          totalRevenue: 1,
+          averageRating: { $round: ["$averageRating", 1] }, // Round rating to one decimal place
+        },
+      },
+    ];
+
+    const topProducts = await Order.aggregate(pipeline);
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          { topProducts },
+          "Best products fetches successfully"
+        )
+      );
+  } catch (error) {
+    console.error("Best products error:", error.message);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch best products." });
+  }
+};
+
 export {
   registerVendor,
   loginVendor,
@@ -571,4 +849,7 @@ export {
   getMonthlySales,
   getMonthlyUnitsSold,
   getOrderStatus,
+  vendorInsights,
+  getCustomerOrderTrends,
+  getBestProducts,
 };

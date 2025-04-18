@@ -89,8 +89,20 @@ const addProduct = asyncHandler(async (req, res) => {
       tags: parsedTags,
     });
 
+    if (product) {
+      const addProductinVendor = await Vendor.findByIdAndUpdate(
+        vendor._id,
+        { $push: { products: product._id } },
+        { new: true }
+      );
+    }
+
     if (!product) {
       throw new ApiError(500, "Failed to add product");
+    }
+
+    if (!addProductinVendor) {
+      throw new ApiError(500, "Failed to add product in Vendor");
     }
 
     return res

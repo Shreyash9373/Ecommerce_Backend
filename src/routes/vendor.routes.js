@@ -14,6 +14,9 @@ import {
   getMonthlySales,
   getMonthlyUnitsSold,
   getOrderStatus,
+  vendorInsights,
+  getCustomerOrderTrends,
+  getBestProducts,
 } from "../controllers/vendor.controller.js";
 
 const router = Router();
@@ -63,5 +66,11 @@ router.route("/month-sales").get(verifyJwtVendor, getMonthlySales);
 router.route("/month-units").get(verifyJwtVendor, getMonthlyUnitsSold);
 
 router.route("/order-status").get(verifyJwtVendor, getOrderStatus);
+
+router.route("/vendor-insights").get(verifyJwtVendor, vendorInsights);
+
+router.route("/order-customers").get(verifyJwtVendor, getCustomerOrderTrends);
+
+router.route("/best-products").get(verifyJwtVendor, getBestProducts);
 
 export default router;
