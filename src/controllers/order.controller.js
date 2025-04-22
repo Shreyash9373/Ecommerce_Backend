@@ -45,6 +45,17 @@ const createOrder = asyncHandler(async (req, res) => {
           if (vendor && vendor.email) {
             // Send email
             await sendLowStockEmail(vendor.email, product.name, product.stock);
+            await Notification.create({
+              message: `Low stock alert: "${product.name}" has only ${product.stock} items left. Email sent to ${vendor.email}`,
+              type: "stock",
+            });
+            if (req.io) {
+              req.io.emit("newNotification", {
+                message: `Low stock alert: "${product.name}" has only ${product.stock} items left.`,
+                type: "stock",
+                createdAt: new Date(),
+              });
+            }
           }
         }
       }

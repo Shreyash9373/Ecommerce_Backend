@@ -1056,9 +1056,36 @@ const getSalesIncomeStats = asyncHandler(async (req, res) => {
   return res.status(200).json({ success: true, data: results });
 });
 
+import { Notification } from "../models/notification.model.js";
+const getAllNotifications = asyncHandler(async (req, res) => {
+  const notifications = await Notification.find().sort({ createdAt: -1 });
+  res.status(200).json({ success: true, data: notifications });
+});
+
+const markNotificationsAsRead = asyncHandler(async (req, res) => {
+  await Notification.updateMany({ isRead: false }, { isRead: true });
+  res
+    .status(200)
+    .json({ success: true, message: "Notifications marked as read" });
+});
+const deleteAllNotifications = asyncHandler(async (req, res) => {
+  const deletedNotifications = await Notification.deleteMany({});
+  res.json({ success: true, deletedNotifications });
+});
+const deleteNotification = asyncHandler(async (req, res) => {
+  const deletedNotification = await Notification.findByIdAndDelete(
+    req.params.id
+  );
+  res.json({ success: true, deletedNotification });
+});
+
 export {
   getSalesIncomeStats,
   getOutOfStockProducts,
+  getAllNotifications,
+  markNotificationsAsRead,
+  deleteAllNotifications,
+  deleteNotification,
   checkAuth,
   getDashboardStats,
   getTopSellingProducts,

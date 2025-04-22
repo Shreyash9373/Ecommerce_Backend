@@ -33,6 +33,11 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
+app.use((req, res, next) => {
+  const io = req.app.get("io"); // get io from app
+  req.io = io; // assign to req object
+  next();
+});
 
 //Importing routes
 import adminRoutes from "./routes/admin.routes.js";
