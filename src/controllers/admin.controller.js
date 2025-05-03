@@ -711,6 +711,8 @@ const handleChatRequest = asyncHandler(async (req, res) => {
         - show top 5 selling products this week
         - show top 5 selling products this month
         - show out-of-stock products
+        - switch to dark mode
+        - switch to light mode
         - create a new product
         - edit product with ID [product_id]
         - show recent orders
@@ -872,6 +874,8 @@ const getTopVendors = asyncHandler(async (req, res) => {
 
   if (range === "month") {
     startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (range === "year") {
+    startDate = new Date(now.getFullYear(), 0, 1);
   } else {
     // Default: past 7 days
     startDate = new Date();
@@ -959,12 +963,14 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     incomeResult.length > 0 ? Math.floor(incomeResult[0].totalIncome) : 0;
 
   const totalPaidOrders = await Order.countDocuments({ paymentStatus: "Paid" });
+  const totalVisitors = await User.countDocuments({});
 
   return res.status(200).json({
     success: true,
     totalSales,
     totalIncome,
     totalPaidOrders,
+    totalVisitors,
     message: "Dashboard stats fetched successfully",
   });
 });
@@ -1000,8 +1006,134 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 //   return { $gte: start, $lt: end };
 // };
 
+// const getSalesIncomeStats = asyncHandler(async (req, res) => {
+//   const { type } = req.query; // 'weekly', 'monthly', 'yearly'
+//   if (!type)
+//     return res.status(400).json({ message: "Time range is required." });
+
+//   const now = new Date();
+//   let groupId = {};
+//   let start;
+
+//   if (type === "weekly") {
+//     const startOfWeek = new Date(now);
+//     startOfWeek.setDate(now.getDate() - now.getDay());
+//     startOfWeek.setHours(0, 0, 0, 0);
+//     start = startOfWeek;
+//     groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday
+//   } else if (type === "monthly") {
+//     // start = new Date(now.getFullYear(), now.getMonth(), 1);
+//     // start = new Date(now.setMonth(now.getMonth() - 1));
+//     const startOfRange = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+//     start = startOfRange;
+
+//     groupId = {
+//       year: { $year: "$createdAt" },
+//       month: { $month: "$createdAt" },
+//     };
+//   } else if (type === "yearly") {
+//     const startYear = now.getFullYear();
+//     start = new Date(startYear, 0, 1);
+//     groupId = { $year: "$createdAt" };
+//   }
+
+//   const matchStage = {
+//     createdAt: { $gte: start },
+//     status: { $in: ["Delivered", "Completed"] },
+//     paymentStatus: "Paid",
+//   };
+
+//   // 💰 Aggregation for sales + income
+//   const salesIncomeAggregation = [
+//     { $match: matchStage },
+//     { $unwind: "$items" },
+//     {
+//       $group: {
+//         _id: groupId,
+//         sales: { $sum: "$items.quantity" },
+//         income: {
+//           $sum: {
+//             $multiply: ["$items.quantity", "$items.productSnapshot.price"],
+//           },
+//         },
+//       },
+//     },
+//     { $sort: { _id: 1 } },
+//   ];
+
+//   // 🧾 Aggregation for ordersPaid (count of orders per group)
+//   const ordersPaidAggregation = [
+//     { $match: matchStage },
+//     {
+//       $group: {
+//         _id: groupId,
+//         ordersPaid: { $sum: 1 },
+//       },
+//     },
+//     { $sort: { _id: 1 } },
+//   ];
+
+//   const totalVisitorAggregation = [
+//     { $match: { createdAt: { $gte: start } } },
+//     {
+//       $group: {
+//         _id: groupId,
+//         count: { $sum: 1 },
+//       },
+//     },
+//     {
+//       $sort: {
+//         _id: 1,
+//       },
+//     },
+//   ];
+
+//   // Run both aggregations
+//   const [salesIncomeResults, ordersPaidResults, totalVisitorResults] =
+//     await Promise.all([
+//       Order.aggregate(salesIncomeAggregation),
+//       Order.aggregate(ordersPaidAggregation),
+//       User.aggregate(totalVisitorAggregation),
+//     ]);
+
+//   // 🔄 Merge both results by _id
+//   const mergedMap = {};
+
+//   salesIncomeResults.forEach((item) => {
+//     mergedMap[item._id] = {
+//       _id: item._id,
+//       sales: item.sales,
+//       income: item.income,
+//     };
+//   });
+
+//   ordersPaidResults.forEach((item) => {
+//     if (!mergedMap[item._id]) {
+//       mergedMap[item._id] = { _id: item._id };
+//     }
+//     mergedMap[item._id].ordersPaid = item.ordersPaid;
+//   });
+//   totalVisitorResults.forEach((item) => {
+//     if (!mergedMap[item._id]) {
+//       mergedMap[item._id] = { _id: item._id };
+//     }
+//     mergedMap[item._id].visitorCount = item.count; // Assuming the count field is named 'count'
+//   });
+
+//   const mergedData = Object.values(mergedMap).sort((a, b) => {
+//     const aDate = new Date(a._id.year, a._id.month - 1);
+//     const bDate = new Date(b._id.year, b._id.month - 1);
+//     return aDate - bDate;
+//   });
+
+//   return res.status(200).json({
+//     success: true,
+//     data: mergedData,
+//   });
+// });
+
 const getSalesIncomeStats = asyncHandler(async (req, res) => {
-  const { type } = req.query; // 'weekly', 'monthly', 'yearly'
+  const { type, startDate } = req.query; // type: 'weekly', 'monthly', 'yearly'
   if (!type)
     return res.status(400).json({ message: "Time range is required." });
 
@@ -1010,31 +1142,45 @@ const getSalesIncomeStats = asyncHandler(async (req, res) => {
   let start;
 
   if (type === "weekly") {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    start = startOfWeek;
-    groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday, 7 = Saturday
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ message: "Start date required for weekly stats" });
+
+    start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday
+
+    // Update matchStage below
   } else if (type === "monthly") {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-    groupId = { $month: "$createdAt" }; // 1 to 31
+    start = new Date(now.getFullYear(), now.getMonth() - 5, 1); // 6 months range
+    groupId = {
+      year: { $year: "$createdAt" },
+      month: { $month: "$createdAt" },
+    };
   } else if (type === "yearly") {
-    const startYear = now.getFullYear() - 2;
-    const endYear = now.getFullYear() + 2;
-
-    // Start from Jan 1st of (current year - 2)
-    start = new Date(startYear, 0, 1);
-
-    groupId = { $year: "$createdAt" }; // 👈 Group by year
+    start = new Date(now.getFullYear() - 4, 0, 1); // 5 years range
+    groupId = { year: { $year: "$createdAt" } };
   }
 
   const matchStage = {
-    createdAt: { $gte: start },
+    createdAt:
+      type === "weekly"
+        ? {
+            $gte: start,
+            $lte: new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000),
+          }
+        : { $gte: start },
     status: { $in: ["Delivered", "Completed"] },
     paymentStatus: "Paid",
   };
 
-  const aggregation = [
+  // 🧾 Aggregation Pipelines
+  const salesIncomeAggregation = [
     { $match: matchStage },
     { $unwind: "$items" },
     {
@@ -1051,9 +1197,86 @@ const getSalesIncomeStats = asyncHandler(async (req, res) => {
     { $sort: { _id: 1 } },
   ];
 
-  const results = await Order.aggregate(aggregation);
+  const ordersPaidAggregation = [
+    { $match: matchStage },
+    {
+      $group: {
+        _id: groupId,
+        ordersPaid: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
 
-  return res.status(200).json({ success: true, data: results });
+  const totalVisitorAggregation = [
+    {
+      $match: {
+        createdAt:
+          type === "weekly"
+            ? {
+                $gte: start,
+                $lte: new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000),
+              }
+            : { $gte: start },
+      },
+    },
+    {
+      $group: {
+        _id: groupId,
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
+
+  const [salesIncomeResults, ordersPaidResults, totalVisitorResults] =
+    await Promise.all([
+      Order.aggregate(salesIncomeAggregation),
+      Order.aggregate(ordersPaidAggregation),
+      User.aggregate(totalVisitorAggregation),
+    ]);
+
+  // 🔄 Merge results
+  const mergedMap = {};
+  salesIncomeResults.forEach((item) => {
+    mergedMap[JSON.stringify(item._id)] = {
+      _id: item._id,
+      sales: item.sales,
+      income: item.income,
+    };
+  });
+
+  ordersPaidResults.forEach((item) => {
+    const key = JSON.stringify(item._id);
+    if (!mergedMap[key]) mergedMap[key] = { _id: item._id };
+    mergedMap[key].ordersPaid = item.ordersPaid;
+  });
+
+  totalVisitorResults.forEach((item) => {
+    const key = JSON.stringify(item._id);
+    if (!mergedMap[key]) mergedMap[key] = { _id: item._id };
+    mergedMap[key].visitorCount = item.count;
+  });
+
+  let mergedData = Object.values(mergedMap);
+
+  // Sort mergedData depending on type
+  if (type === "weekly") {
+    mergedData.sort((a, b) => a._id - b._id); // sort by day of week (1–7)
+  } else if (type === "monthly") {
+    mergedData.sort((a, b) => {
+      const aDate = new Date(a._id.year, a._id.month - 1);
+      const bDate = new Date(b._id.year, b._id.month - 1);
+      return aDate - bDate;
+    });
+  } else if (type === "yearly") {
+    mergedData.sort((a, b) => a._id.year - b._id.year);
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: mergedData,
+  });
 });
 
 import { Notification } from "../models/notification.model.js";
