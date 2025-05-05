@@ -7,7 +7,7 @@ const VendorSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-    },  
+    },
     email: {
       type: String,
       required: true,
@@ -69,7 +69,7 @@ const VendorSchema = new mongoose.Schema(
     balance: { type: Number, default: 0 },
     withdrawableBalance: { type: Number, default: 0 },
     paymentMethods: {
-      stripe: { type: String },
+      UPI: { type: String },
       paypal: { type: String },
       bankAccount: {
         accountName: String,
