@@ -1,3 +1,4 @@
+//user.contrroller
 import mongoose, { isValidObjectId } from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -107,63 +108,71 @@ const loginUser = asyncHandler(async (req, res) => {
     user._id
   );
 
-  user.refreshToken = refreshtoken;
-
-  const newUser = await User.findById(user._id).select(
+  const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
 
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accesstoken, options)
+    .cookie("refreshToken", refreshtoken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken: accesstoken,  // Changed to camelCase for consistency
+          refreshToken: refreshtoken, // Changed to camelCase for consistency
+        },
+        "User logged-in successfully"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+  // get User from cookies
+  // clear cookies of user
+
+  const userId = req.user._id;
+
+  await User.findByIdAndUpdate(
+    userId,
+    {
+      $unset: {
+        refreshToken: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  // Set cookies with tokens
   const accessTokenOptions = cookieOptions("access");
   const refreshTokenOptions = cookieOptions("refresh");
 
   return res
-  .status(200)
-  .cookie("accessToken", accesstoken, accessTokenOptions)
-  .cookie("refreshToken", refreshtoken, refreshTokenOptions)
-  .json({
-    success: true,
-    message: "User logged in successfully",
-    accessToken: accesstoken,
-    refreshToken: refreshtoken,
-    user: newUser,
-  });
-});
-
-const logoutUser = asyncHandler(async (req, res) => {
-  try {
-    const accessTokenOptions = cookieOptions("access");
-    const refreshTokenOptions = cookieOptions("refresh");
-
-    // If user exists, remove refresh token from DB
-    if (req.user && req.user._id) {
-      await User.findByIdAndUpdate(
-        req.user._id,
-        { $unset: { refreshToken: 1 } },
-        { new: true }
-      );
-    }
-
-    // Clear cookies anyway
-    return res
-      .status(200)
-      .clearCookie("accessToken", accessTokenOptions)
-      .clearCookie("refreshToken", refreshTokenOptions)
-      .json(new ApiResponse(200, {}, "User Logout Successful"));
-  } catch (err) {
-    return res.status(200).json(new ApiResponse(200, {}, "User Logged Out (Silent)"));
-  }
+    .status(200)
+    .clearCookie("accessToken", accessTokenOptions)
+    .clearCookie("refreshToken", refreshTokenOptions)
+    .json(new ApiResponse(200, {}, "User Logout Successfull"));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
   const user = req.user;
 
-  if (!user) {
-    throw new ApiError(400, "Failed to fetch user");
+  if (user) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, user, "Current Vendor Fetched Successfully"));
+  } else {
+    throw new ApiError(400, "Failed to fetch Vendor");
   }
-
-  return res.status(200).json(
-    new ApiResponse(200, user, "Current user fetched successfully")
-  );
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
