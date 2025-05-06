@@ -8,6 +8,12 @@ import {
   logoutUser,
   getCurrentUser,
   updateUserDetails,
+  updatePassword,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+ // getUserWithAddresses,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -27,7 +33,7 @@ router.route("/login").post(loginUser);
 // secured routes
 router.post("/logout", logoutUser);
 router.route("/get-user").get(verifyJwtUser, getCurrentUser);
-
+router.route("/update-password").patch(verifyJwtUser, updatePassword);
 router.route("/update-user").put(
   upload.fields([
     {
@@ -41,5 +47,11 @@ router.route("/update-user").put(
   verifyJwtUser,
   updateUserDetails
 );
+//address routes
+router.route("/add-address").patch(verifyJwtUser, addAddress);
+router.route("/update-address/:addressId").patch(verifyJwtUser, updateAddress);
+router.route("/delete-address/:addressId").delete(verifyJwtUser, deleteAddress);
+router.route("/set-default-address/:addressId").patch(verifyJwtUser, setDefaultAddress);
+// router.route("/get-user-addresses").get(verifyJwtUser, getUserWithAddresses);
 
 export default router;

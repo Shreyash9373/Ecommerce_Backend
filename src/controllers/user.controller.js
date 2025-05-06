@@ -135,43 +135,60 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-  // get User from cookies
-  // clear cookies of user
+  try {
+    const userId = req.user._id;
+    
+    await User.findByIdAndUpdate(
+      userId,
+      { $unset: { refreshToken: 1 } },
+      { new: true }
+    );
 
-  const userId = req.user._id;
+    // Clear cookies
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
 
-  await User.findByIdAndUpdate(
-    userId,
-    {
-      $unset: {
-        refreshToken: 1,
-      },
-    },
-    {
-      new: true,
-    }
-  );
-
-  // Set cookies with tokens
-  const accessTokenOptions = cookieOptions("access");
-  const refreshTokenOptions = cookieOptions("refresh");
-
-  return res
-    .status(200)
-    .clearCookie("accessToken", accessTokenOptions)
-    .clearCookie("refreshToken", refreshTokenOptions)
-    .json(new ApiResponse(200, {}, "User Logout Successfull"));
-});
-
-const getCurrentUser = asyncHandler(async (req, res) => {
-  const user = req.user;
-
-  if (user) {
     return res
       .status(200)
-      .json(new ApiResponse(200, user, "Current Vendor Fetched Successfully"));
-  } else {
-    throw new ApiError(400, "Failed to fetch Vendor");
+      .json(new ApiResponse(200, {}, "User Logout Successfull"));
+      
+  } catch (error) {
+    console.error("Logout error:", error);
+    throw new ApiError(500, "Logout failed. Please try again.");
+  }
+}); 
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  try {
+    const includeAddresses = req.query.includeAddresses === 'true';
+    
+    const query = User.findById(req.user._id).select('-password -refreshToken');
+    
+    if (includeAddresses) {
+      query.select('+addresses'); // Explicitly include addresses
+    }
+
+    const user = await query;
+    
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Convert to plain JavaScript object
+    const userObj = user.toObject();
+    
+    // Ensure addresses exists as an array
+    if (includeAddresses && !userObj.addresses) {
+      userObj.addresses = [];
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: userObj,
+      message: "User data fetched successfully"
+    });
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to fetch user");
   }
 });
 
@@ -219,10 +236,179 @@ const updateUserDetails = asyncHandler(async (req, res) => {
   }
 });
 
+
+const updatePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const isPasswordValid = await user.isPasswordCorrect(currentPassword);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Current password is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password updated successfully"));
+});
+
+
+// Add new address
+const addAddress = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const newAddress = req.body;
+
+  try {
+    // If setting as default, first unset any existing default
+    if (newAddress.isDefault) {
+      await User.updateOne(
+        { _id: userId, "addresses.isDefault": true },
+        { $set: { "addresses.$.isDefault": false } }
+      );
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $push: { addresses: newAddress } },
+      { new: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+      throw new ApiError(404, "User not found");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { user: updatedUser }, "Address added successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to add address");
+  }
+});
+
+// Update existing address
+const updateAddress = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const addressId = req.params.addressId;
+  const updatedData = req.body;
+
+  try {
+    // If setting as default, first unset any existing default
+    if (updatedData.isDefault) {
+      await User.updateOne(
+        { _id: userId, "addresses.isDefault": true },
+        { $set: { "addresses.$.isDefault": false } }
+      );
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, "addresses._id": addressId },
+      { $set: { "addresses.$": updatedData } },
+      { new: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+      throw new ApiError(404, "Address not found");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedUser.addresses, "Address updated successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to update address");
+  }
+});
+
+// Delete address
+const deleteAddress = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const addressId = req.params.addressId;
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { addresses: { _id: addressId } } },
+      { new: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+      throw new ApiError(404, "User not found");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedUser.addresses, "Address deleted successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to delete address");
+  }
+});
+
+// Set default address
+const setDefaultAddress = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const addressId = req.params.addressId;
+
+  try {
+    // First unset any existing default
+    await User.updateOne(
+      { _id: userId, "addresses.isDefault": true },
+      { $set: { "addresses.$.isDefault": false } }
+    );
+
+    // Then set the new default
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, "addresses._id": addressId },
+      { $set: { "addresses.$.isDefault": true } },
+      { new: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+      throw new ApiError(404, "Address not found");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedUser.addresses, "Default address set successfully"));
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to set default address");
+  }
+});
+
+// const getUserWithAddresses = asyncHandler(async (req, res) => {
+//   try {
+//     const user = await User.findById(req.user._id).select('-password -refreshToken');
+    
+//     if (!user) {
+//       throw new ApiError(404, "User not found");
+//     }
+
+//     return res
+//       .status(200)
+//       .json(new ApiResponse(200, { user }, "User with addresses fetched successfully"));
+//   } catch (error) {
+//     throw new ApiError(500, error.message || "Failed to fetch user with addresses");
+//   }
+// });
+
+// Add to the exports
 export {
   registerUser,
   loginUser,
   logoutUser,
   getCurrentUser,
   updateUserDetails,
+  updatePassword,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+ // getUserWithAddresses,
 };
+// Add to the exports
+
+
