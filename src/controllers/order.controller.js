@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import { isValidObjectId } from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -7,6 +8,7 @@ import { Vendor } from "../models/vendor.model.js";
 import { Order } from "../models/orders.model.js";
 import { Product } from "../models/products.model.js";
 import { User } from "../models/users.model.js";
+import { sendLowStockEmail } from "../utils/sendEmail.js";
 
 const createOrder = asyncHandler(async (req, res) => {
   try {
@@ -27,6 +29,27 @@ const createOrder = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Product not found");
       }
 
+      // ✅ Check if enough stock
+      if (product.stock < quantity) {
+        throw new ApiError(400, `Insufficient stock for ${product.name}`);
+      }
+
+      // ✅ Deduct stock
+      // await Product.findByIdAndUpdate(productId, {
+      //   $inc: { stock: -quantity },
+      // });
+
+      // if (product.stock - quantity < 5) {
+      //   const product = await Product.findById(productId);
+      //   if (product && product.stock < 5) {
+      //     const vendor = await Vendor.findById(product.vendorId);
+      //     if (vendor && vendor.email) {
+      //       // Send email
+      //       await sendLowStockEmail(vendor.email, product.name, product.stock);
+      //     }
+      //   }
+      // }
+
       // Store full product details in order
       orderItems.push({
         productId: product._id,
@@ -45,8 +68,8 @@ const createOrder = asyncHandler(async (req, res) => {
       totalAmount += product.price * quantity;
       vendorIds.add(product.vendorId.toString());
     }
-    const paymentStatus =
-      paymentMethod == "Cash on Delivery" ? "Pending" : "Paid";
+    // const paymentStatus =
+    //   paymentMethod == "COD" ? "Pending" : "Paid";
 
     const newOrder = await Order.create({
       buyerId,
@@ -56,18 +79,44 @@ const createOrder = asyncHandler(async (req, res) => {
       status: "Processing",
       paymentMethod,
       shippingAddress,
-      paymentStatus,
+      paymentStatus: "Pending",
     });
 
     if (!newOrder) {
       throw new ApiError(500, " Failed to Place Order");
     }
 
+    // ✅ QR Code Generation (only if UPI payment method selected)
+    let qrImage = null;
+    if (paymentMethod === "UPI") {
+      const vendorIdArray = Array.from(vendorIds); // FIXED
+      const vendor = await Vendor.findById(vendorIdArray[0]);
+
+      if (!vendor) {
+        throw new ApiError(404, `Vendor not found: ${vendorIdArray[0]}`);
+      }
+
+      const upiID = vendor.paymentMethods?.UPI;
+      const upiNote = `Order #${newOrder._id}`;
+      const upiLink = `upi://pay?pa=${upiID}&pn=Shop&tn=${upiNote}&am=${totalAmount}&cu=INR`;
+
+      qrImage = await QRCode.toDataURL(upiLink);
+
+      console.log("Vendor details: ", upiID, qrImage);
+    }
+
     return res
       .status(201)
-      .json(new ApiResponse(201, newOrder, "Order Places Successfully"));
+      .json(
+        new ApiResponse(201, { newOrder, qrImage }, "Order Places Successfully")
+      );
   } catch (error) {
-    next(new ApiError(400, "Error while placing order"));
+    console.log("error ", error);
+    res.status(500).json({
+      success: false,
+
+      message: `Failed to fetch best products. ${error}`,
+    });
   }
 });
 
@@ -105,6 +154,22 @@ const getOrderByStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
 });
 
+const getVendorOrderByStatus = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { status } = req.query;
+
+  // Use find() to get all products with the given status
+  const orders = await Order.find({ status: status, vendorId: vendorId });
+
+  if (!orders) {
+    throw new ApiError(404, "No orders found with this status");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
+});
+
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id, status } = req.body;
 
@@ -126,4 +191,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, order, "Order status updated"));
 });
 
-export { createOrder, getVendorOrders, getOrderByStatus, updateOrderStatus };
+export {
+  createOrder,
+  getVendorOrders,
+  getVendorOrderByStatus,
+  getOrderByStatus,
+  updateOrderStatus,
+};

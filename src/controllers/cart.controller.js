@@ -172,4 +172,26 @@ const removeItem = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { addItem, getCart, updateCartItem, removeItem };
+const clearCart = asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    let cart = await Cart.findOne({ userId });
+    if (!cart) {
+      return next(new ApiError(404, "Cart not found"));
+    }
+
+    cart.items = [];
+    cart.totalPrice = 0;
+
+    await cart.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, cart, "Cart cleared successfully"));
+  } catch (error) {
+    console.error("Error clearing cart:", error);
+    return next(new ApiError(500, "Failed to clear cart"));
+  }
+});
+
+export { addItem, getCart, updateCartItem, removeItem, clearCart };

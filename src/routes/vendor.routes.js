@@ -10,6 +10,13 @@ import {
   updateVendorDetails,
   getVendorById,
   resetPassword,
+  earningOverview,
+  getMonthlySales,
+  getMonthlyUnitsSold,
+  getOrderStatus,
+  vendorInsights,
+  getCustomerOrderTrends,
+  getBestProducts,
 } from "../controllers/vendor.controller.js";
 
 const router = Router();
@@ -49,5 +56,21 @@ router.route("/update-vendor").put(
   verifyJwtVendor,
   updateVendorDetails
 );
+
+router.route("/earning-overview").get(verifyJwtVendor, earningOverview);
+
+// Dashboard Routes
+
+router.route("/month-sales").get(verifyJwtVendor, getMonthlySales);
+
+router.route("/month-units").get(verifyJwtVendor, getMonthlyUnitsSold);
+
+router.route("/order-status").get(verifyJwtVendor, getOrderStatus);
+
+router.route("/vendor-insights").get(verifyJwtVendor, vendorInsights);
+
+router.route("/order-customers").get(verifyJwtVendor, getCustomerOrderTrends);
+
+router.route("/best-products").get(verifyJwtVendor, getBestProducts);
 
 export default router;

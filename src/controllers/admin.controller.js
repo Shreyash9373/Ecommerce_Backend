@@ -32,6 +32,15 @@ const genAccessAndRefreshTokens = async (userId) => {
   }
 };
 
+//Admin authentication controller to check if accessToken is present or not
+const checkAuth = asyncHandler(async (req, res) => {
+  const accessToken = req.cookies.accessToken; // Access token from HttpOnly cookie
+  if (accessToken) {
+    return res.json({ isAuthenticated: true });
+  }
+  return res.json({ isAuthenticated: false });
+});
+
 //Admin login controller
 const adminLoginController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -566,12 +575,9 @@ const deleteVendor = asyncHandler(async (req, res) => {
 
 const getSearchVendor = asyncHandler(async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 10 } = req.query; // ✅ Add search, pagination
+    const { search, page = 1, limit = 10 } = req.query; // ✅ Add search, pagination
 
     const query = {};
-
-    // If status is provided, filter by status
-    if (status) query.status = status;
 
     // If search is provided, filter vendors by name, email, or phone
     if (search) {
@@ -676,6 +682,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
 });
 
 export {
+  checkAuth,
   adminLoginController,
   logoutAdmin,
   addCategory,

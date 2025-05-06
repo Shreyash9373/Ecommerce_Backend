@@ -37,4 +37,25 @@ const sendOtpEmail = async (email, otp) => {
   }
 };
 
-export { sendEmail, sendOtpEmail };
+const sendLowStockEmail = async (toEmail, productName, currentStock) => {
+  try {
+    await transporter.sendMail({
+      from: `"Ecommerce Admin" <${process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: `⚠️ Low Stock Alert: ${productName}`,
+      html: `
+      <h3>Hello Vendor,</h3>
+      <p>Your product <strong>${productName}</strong> is low on stock.</p>
+      <p>Current stock is <strong>${currentStock}</strong>.</p>
+      <p>Please restock soon to avoid missing orders.</p>
+      <br/>
+      <p>Regards,<br/>Ecommerce Platform</p>
+    `,
+    });
+  } catch (error) {
+    console.error("Error sending lowStock email:", error);
+    throw new Error("Failed to send lowStock email.");
+  }
+};
+
+export { sendEmail, sendOtpEmail, sendLowStockEmail };
