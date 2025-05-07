@@ -102,7 +102,7 @@ const createOrder = asyncHandler(async (req, res) => {
 
       qrImage = await QRCode.toDataURL(upiLink);
 
-      console.log("Vendor details: ", upiID, qrImage);
+      // console.log("Vendor details: ", upiID, qrImage);
     }
 
     return res
@@ -116,6 +116,91 @@ const createOrder = asyncHandler(async (req, res) => {
       success: false,
 
       message: `Failed to fetch best products. ${error}`,
+    });
+  }
+});
+
+const submitPayment = asyncHandler(async (req, res) => {
+  try {
+    const buyerId = req.user._id;
+    let { orderId, payment, transactionId } = req.body;
+
+    if (!payment || !orderId) {
+      throw new ApiError(400, "Payment amount is empty || Order Id is missing");
+    }
+
+    if (!transactionId) {
+      transactionId = orderId;
+    }
+
+    let paymentproofUrl;
+    if (req.files?.paymentProof) {
+      const paymentProofLocalPath = Array.isArray(req.files.paymentProof)
+        ? req.files.paymentProof[0].path
+        : req.files.paymentProof.path;
+
+      if (!paymentProofLocalPath) {
+        throw new ApiError(400, "Invalid payment proof file");
+      }
+
+      const paymentProofUpload = await uploadCloudinary(paymentProofLocalPath, {
+        folder: "Payments",
+      });
+
+      paymentproofUrl = paymentProofUpload?.secure_url;
+    }
+
+    if (!paymentproofUrl) {
+      throw new ApiError(500, "Failed to upload payment proof");
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        "paymentProof.paymentScreenshot": paymentproofUrl,
+        "paymentProof.transactionId": transactionId,
+      },
+      { new: true }
+    );
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    // ✅ Loop over items and update stock
+    for (const item of order.items) {
+      const { productId, quantity } = item;
+
+      // Deduct stock
+      const product = await Product.findByIdAndUpdate(
+        productId,
+        { $inc: { stock: -quantity } },
+        { new: true }
+      );
+
+      // ✅ If stock falls below threshold, send email
+      if (product && product.stock < 5) {
+        const vendor = await Vendor.findById(product.vendorId);
+        if (vendor && vendor.email) {
+          await sendLowStockEmail(vendor.email, product.name, product.stock);
+        }
+      }
+    }
+
+    return res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          { order, paymentproofUrl },
+          "Payment proof saved and Stock updated Successfully"
+        )
+      );
+  } catch (error) {
+    console.error("Error in submitPayment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while processing the payment.",
     });
   }
 });
@@ -193,6 +278,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
 export {
   createOrder,
+  submitPayment,
   getVendorOrders,
   getVendorOrderByStatus,
   getOrderByStatus,

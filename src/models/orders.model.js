@@ -69,6 +69,10 @@ const OrderSchema = new mongoose.Schema(
       zip: String,
       country: String,
     },
+    paymentProof: {
+      paymentScreenshot: { type: String },
+      tansactionId: { type: String },
+    },
   },
   { timestamps: true }
 );
