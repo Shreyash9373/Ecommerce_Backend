@@ -7,6 +7,7 @@ import {
   loginUser,
   logoutUser,
   getCurrentUser,
+  getUserAddress,
   updateUserDetails,
 } from "../controllers/user.controller.js";
 
@@ -27,6 +28,7 @@ router.route("/login").post(loginUser);
 // secured routes
 router.route("/logout").post(verifyJwtUser, logoutUser);
 router.route("/get-user").get(verifyJwtUser, getCurrentUser);
+router.route("/get-address").get(verifyJwtUser, getUserAddress);
 
 router.route("/update-user").put(
   upload.fields([

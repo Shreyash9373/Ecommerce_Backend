@@ -68,8 +68,7 @@ const createOrder = asyncHandler(async (req, res) => {
       totalAmount += product.price * quantity;
       vendorIds.add(product.vendorId.toString());
     }
-    // const paymentStatus =
-    //   paymentMethod == "COD" ? "Pending" : "Paid";
+    const paymentStatus = paymentMethod == "COD" ? "Pending" : "Processing";
 
     const newOrder = await Order.create({
       buyerId,
@@ -79,7 +78,7 @@ const createOrder = asyncHandler(async (req, res) => {
       status: "Processing",
       paymentMethod,
       shippingAddress,
-      paymentStatus: "Pending",
+      paymentStatus: paymentStatus,
     });
 
     if (!newOrder) {
@@ -163,6 +162,8 @@ const submitPayment = asyncHandler(async (req, res) => {
       { new: true }
     );
 
+    console.log("Order with payment : ", order);
+
     if (!order) {
       throw new ApiError(404, "Order not found");
     }
@@ -203,6 +204,25 @@ const submitPayment = asyncHandler(async (req, res) => {
       message: "Something went wrong while processing the payment.",
     });
   }
+});
+
+const getUserOrders = asyncHandler(async (req, res) => {
+  const buyerId = req.user._id;
+
+  if (!isValidObjectId(buyerId)) {
+    throw new ApiError(400, "Invalid User id");
+  }
+
+  const orders = await Order.find({ buyerId: buyerId });
+  if (!orders) {
+    throw new ApiError(404, "Vendor not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { orders }, "Vendor details fetched successfully")
+    );
 });
 
 const getVendorOrders = asyncHandler(async (req, res) => {
@@ -283,4 +303,5 @@ export {
   getVendorOrderByStatus,
   getOrderByStatus,
   updateOrderStatus,
+  getUserOrders,
 };

@@ -218,10 +218,26 @@ const updateUserDetails = asyncHandler(async (req, res) => {
   }
 });
 
+const getUserAddress = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  if (user) {
+    const address = user.addresses;
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, address, "Current Vendor Fetched Successfully")
+      );
+  } else {
+    throw new ApiError(400, "Failed to fetch Vendor");
+  }
+});
+
 export {
   registerUser,
   loginUser,
   logoutUser,
   getCurrentUser,
+  getUserAddress,
   updateUserDetails,
 };

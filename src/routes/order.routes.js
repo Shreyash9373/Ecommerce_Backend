@@ -9,6 +9,7 @@ import {
   getVendorOrderByStatus,
   getOrderByStatus,
   updateOrderStatus,
+  getUserOrders,
 } from "../controllers/order.controller.js";
 
 const router = Router();
@@ -31,5 +32,7 @@ router.route("/get-order").get(verifyJwtVendor, getVendorOrders);
 router.route("/order-status").get(verifyJwtVendor, getVendorOrderByStatus);
 router.route("/get-OrderStatus").get(getOrderByStatus);
 router.route("/update-OrderStatus").put(verifyJwtVendor, updateOrderStatus);
+
+router.route("/get-UserOrder").put(verifyJwtUser, getUserOrders);
 
 export default router;
