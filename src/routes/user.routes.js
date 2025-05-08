@@ -7,6 +7,7 @@ import {
   loginUser,
   logoutUser,
   getCurrentUser,
+  getUserAddress,
   updateUserDetails,
   updatePassword,
   addAddress,
@@ -33,7 +34,12 @@ router.route("/login").post(loginUser);
 // secured routes
 router.post("/logout", logoutUser);
 router.route("/get-user").get(verifyJwtUser, getCurrentUser);
+
+router.route("/get-address").get(verifyJwtUser, getUserAddress);
+
+
 router.route("/update-password").patch(verifyJwtUser, updatePassword);
+
 router.route("/update-user").put(
   upload.fields([
     {
