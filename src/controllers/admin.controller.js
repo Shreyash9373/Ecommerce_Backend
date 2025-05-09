@@ -8,9 +8,11 @@ import { uploadCloudinary, deleteInCloudinary } from "../utils/cloudinary.js";
 import { Product } from "../models/products.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import { Vendor } from "../models/vendor.model.js";
+import { Order } from "../models/orders.model.js";
 import { User } from "../models/users.model.js";
 import { sendEmail, sendOtpEmail } from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 
 //Token generation function
 const genAccessAndRefreshTokens = async (userId) => {
@@ -681,8 +683,636 @@ const verifyOtp = asyncHandler(async (req, res) => {
     .json({ success: true, token, message: "Otp verified successfully" });
 });
 
+//Chatbot controller
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from "@google/generative-ai";
+import fs from "node:fs";
+import mime from "mime-types";
+
+const handleChatRequest = asyncHandler(async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const userQuery = req.body.query;
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+  });
+  const prompt = `You are a helpful assistant for an ecommerce admin dashboard. 
+        Identify the user's intent from the following query based on these possible actions:
+        - show pending products
+        - show approved products
+        - show rejected products
+        - show pending vendors
+        - show approved vendors
+        - show rejected vendors
+        - show top 5 selling products this week
+        - show top 5 selling products this month
+        - show out-of-stock products
+        - switch to dark mode
+        - switch to light mode
+        - create a new product
+        - edit product with ID [product_id]
+        - show recent orders
+        - search for orders by customer [customer_name]
+        - update inventory for product [product_sku]
+        - show user statistics
+        - help with [specific_feature]
+
+
+
+         If the user's query is **ambiguous** (e.g., "show approved" or "show rejected") and it's not clear whether they are referring to products or vendors, respond with:
+{
+  "intent": "clarify",
+  "message": "Do you want to see approved products or approved vendors?"
+}
+  
+
+        If the intent matches one of these actions, respond with a JSON object in the format:
+        { "intent": "[identified_intent]", "parameters": {"range": "[week or month]" // If applicable, e.g. for top 5 selling products}, "message": "[user-friendly message]" }
+
+        If the intent is outside the scope of these actions, respond with:
+        { "intent": "unknown", "message": "Sorry, I can only help with tasks related to the admin dashboard." }
+
+        User query: "${userQuery}"`;
+  const generationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 40,
+    maxOutputTokens: 100,
+    responseModalities: [],
+    responseMimeType: "text/plain",
+  };
+
+  const chatSession = model.startChat({
+    generationConfig,
+    history: [],
+  });
+
+  const result = await model.generateContent(prompt);
+  console.log("Result", result.response);
+  const responseText = result.response?.text();
+  console.log("ResponseText", responseText);
+  const cleanText = responseText
+    .replace(/```json\s*/, "") // remove ```json (with optional whitespace)
+    .replace(/```/, "") // remove closing ```
+    .trim();
+  console.log("Cleantext", cleanText);
+  let parsedResponse;
+  try {
+    parsedResponse = JSON.parse(cleanText);
+    if (
+      /^show (top( 5)?)|(best selling)|(top selling) products/.test(
+        parsedResponse.intent?.toLowerCase()
+      )
+    ) {
+      parsedResponse.intent = "show top products";
+    }
+    console.log("ParesedResponse", parsedResponse);
+  } catch (error) {
+    console.log("ParesedResponse", parsedResponse);
+
+    console.error("Error parsing Gemini response:", error, responseText);
+    parsedResponse = {
+      intent: "error",
+      message: "Sorry, I encountered an error processing your request.",
+    };
+  }
+  // const chatResponse = await chatSession.sendMessage(userQuery);
+  // TODO: Following code needs to be updated for client-side apps.
+  const candidates = result.response.candidates;
+  // for (
+  //   let candidate_index = 0;
+  //   candidate_index < candidates.length;
+  //   candidate_index++
+  // ) {
+  //   for (
+  //     let part_index = 0;
+  //     part_index < candidates[candidate_index].content.parts.length;
+  //     part_index++
+  //   ) {
+  //     const part = candidates[candidate_index].content.parts[part_index];
+  //     if (part.inlineData) {
+  //       try {
+  //         const filename = `output_${candidate_index}_${part_index}.${mime.extension(part.inlineData.mimeType)}`;
+  //         fs.writeFileSync(
+  //           filename,
+  //           Buffer.from(part.inlineData.data, "base64")
+  //         );
+  //         console.log(`Output written to: ${filename}`);
+  //       } catch (err) {
+  //         console.error(err);
+  //       }
+  //     }
+  //   }
+  // }
+  // console.log(chatResponse.response.text());
+
+  // return res.status(200).json({ response: result.response.text() });
+  return res.status(200).json({ response: parsedResponse });
+});
+
+const getTopSellingProducts = asyncHandler(async (req, res) => {
+  const { range } = req.query; // 'week' or 'month'
+
+  let startDate;
+  const today = new Date();
+
+  if (range === "week") {
+    startDate = new Date(today.setDate(today.getDate() - 7));
+  } else if (range === "month") {
+    startDate = new Date(today.setMonth(today.getMonth() - 1));
+  } else {
+    return res.status(400).json({ message: "Invalid range" });
+  }
+
+  const topProducts = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate },
+        status: { $in: ["Delivered", "Completed"] }, // only completed orders
+      },
+    },
+    { $unwind: "$items" }, // deconstruct the array of items
+    {
+      $group: {
+        _id: "$items.productId",
+        totalSold: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "productInfo",
+      },
+    },
+    { $unwind: "$productInfo" },
+    {
+      $project: {
+        _id: 0,
+        productId: "$productInfo._id",
+        name: "$productInfo.name",
+        totalSold: 1,
+        image: { $arrayElemAt: ["$productInfo.images", 0] },
+      },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  res.status(200).json({ topProducts });
+});
+
+const getTopVendors = asyncHandler(async (req, res) => {
+  const range = req.query.range || "week";
+  const now = new Date();
+  let startDate;
+
+  if (range === "month") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (range === "year") {
+    startDate = new Date(now.getFullYear(), 0, 1);
+  } else {
+    // Default: past 7 days
+    startDate = new Date();
+    startDate.setDate(now.getDate() - 7);
+  }
+
+  const topVendors = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate },
+        status: { $in: ["Delivered", "Completed"] },
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.productSnapshot.vendorId",
+        totalSold: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $lookup: {
+        from: "vendors",
+        localField: "_id",
+        foreignField: "_id",
+        as: "vendorInfo",
+      },
+    },
+    { $unwind: "$vendorInfo" },
+    {
+      $project: {
+        vendorId: "$_id",
+        totalSold: 1,
+        name: "$vendorInfo.name",
+        avatar: "$vendorInfo.avatar",
+        storeName: "$vendorInfo.storeName",
+        email: "$vendorInfo.email",
+      },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    topVendors,
+  });
+});
+const getOutOfStockProducts = asyncHandler(async (req, res) => {
+  const products = await Product.find({ stock: 0, status: "approved" });
+  res.status(200).json({
+    success: true,
+    Products: products,
+  });
+});
+const getDashboardStats = asyncHandler(async (req, res) => {
+  // Total sales (from previous)
+  const salesResult = await Product.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalSold: { $sum: "$sold" },
+      },
+    },
+  ]);
+
+  const totalSales = salesResult.length > 0 ? salesResult[0].totalSold : 0;
+
+  // Total income
+  const incomeResult = await Product.aggregate([
+    {
+      $project: {
+        revenue: { $multiply: ["$finalPrice", "$sold"] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalIncome: { $sum: "$revenue" },
+      },
+    },
+  ]);
+
+  const totalIncome =
+    incomeResult.length > 0 ? Math.floor(incomeResult[0].totalIncome) : 0;
+
+  const totalPaidOrders = await Order.countDocuments({ paymentStatus: "Paid" });
+  const totalVisitors = await User.countDocuments({});
+
+  return res.status(200).json({
+    success: true,
+    totalSales,
+    totalIncome,
+    totalPaidOrders,
+    totalVisitors,
+    message: "Dashboard stats fetched successfully",
+  });
+});
+
+// Utility to get date ranges
+// const getDateRange = (type) => {
+//   const now = new Date();
+//   let start, end;
+
+//   switch (type) {
+//     case "daily":
+//       start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+//       end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+//       break;
+
+//     case "weekly":
+//       const firstDayOfWeek = now.getDate() - now.getDay(); // Sunday
+//       start = new Date(now.getFullYear(), now.getMonth(), firstDayOfWeek);
+//       end = new Date(now.getFullYear(), now.getMonth(), firstDayOfWeek + 7);
+//       break;
+
+//     case "monthly":
+//       start = new Date(now.getFullYear(), now.getMonth(), 1);
+//       end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+//       break;
+
+//     case "yearly":
+//       start = new Date(now.getFullYear(), 0, 1);
+//       end = new Date(now.getFullYear() + 1, 0, 1);
+//       break;
+//   }
+
+//   return { $gte: start, $lt: end };
+// };
+
+// const getSalesIncomeStats = asyncHandler(async (req, res) => {
+//   const { type } = req.query; // 'weekly', 'monthly', 'yearly'
+//   if (!type)
+//     return res.status(400).json({ message: "Time range is required." });
+
+//   const now = new Date();
+//   let groupId = {};
+//   let start;
+
+//   if (type === "weekly") {
+//     const startOfWeek = new Date(now);
+//     startOfWeek.setDate(now.getDate() - now.getDay());
+//     startOfWeek.setHours(0, 0, 0, 0);
+//     start = startOfWeek;
+//     groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday
+//   } else if (type === "monthly") {
+//     // start = new Date(now.getFullYear(), now.getMonth(), 1);
+//     // start = new Date(now.setMonth(now.getMonth() - 1));
+//     const startOfRange = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+//     start = startOfRange;
+
+//     groupId = {
+//       year: { $year: "$createdAt" },
+//       month: { $month: "$createdAt" },
+//     };
+//   } else if (type === "yearly") {
+//     const startYear = now.getFullYear();
+//     start = new Date(startYear, 0, 1);
+//     groupId = { $year: "$createdAt" };
+//   }
+
+//   const matchStage = {
+//     createdAt: { $gte: start },
+//     status: { $in: ["Delivered", "Completed"] },
+//     paymentStatus: "Paid",
+//   };
+
+//   // 💰 Aggregation for sales + income
+//   const salesIncomeAggregation = [
+//     { $match: matchStage },
+//     { $unwind: "$items" },
+//     {
+//       $group: {
+//         _id: groupId,
+//         sales: { $sum: "$items.quantity" },
+//         income: {
+//           $sum: {
+//             $multiply: ["$items.quantity", "$items.productSnapshot.price"],
+//           },
+//         },
+//       },
+//     },
+//     { $sort: { _id: 1 } },
+//   ];
+
+//   // 🧾 Aggregation for ordersPaid (count of orders per group)
+//   const ordersPaidAggregation = [
+//     { $match: matchStage },
+//     {
+//       $group: {
+//         _id: groupId,
+//         ordersPaid: { $sum: 1 },
+//       },
+//     },
+//     { $sort: { _id: 1 } },
+//   ];
+
+//   const totalVisitorAggregation = [
+//     { $match: { createdAt: { $gte: start } } },
+//     {
+//       $group: {
+//         _id: groupId,
+//         count: { $sum: 1 },
+//       },
+//     },
+//     {
+//       $sort: {
+//         _id: 1,
+//       },
+//     },
+//   ];
+
+//   // Run both aggregations
+//   const [salesIncomeResults, ordersPaidResults, totalVisitorResults] =
+//     await Promise.all([
+//       Order.aggregate(salesIncomeAggregation),
+//       Order.aggregate(ordersPaidAggregation),
+//       User.aggregate(totalVisitorAggregation),
+//     ]);
+
+//   // 🔄 Merge both results by _id
+//   const mergedMap = {};
+
+//   salesIncomeResults.forEach((item) => {
+//     mergedMap[item._id] = {
+//       _id: item._id,
+//       sales: item.sales,
+//       income: item.income,
+//     };
+//   });
+
+//   ordersPaidResults.forEach((item) => {
+//     if (!mergedMap[item._id]) {
+//       mergedMap[item._id] = { _id: item._id };
+//     }
+//     mergedMap[item._id].ordersPaid = item.ordersPaid;
+//   });
+//   totalVisitorResults.forEach((item) => {
+//     if (!mergedMap[item._id]) {
+//       mergedMap[item._id] = { _id: item._id };
+//     }
+//     mergedMap[item._id].visitorCount = item.count; // Assuming the count field is named 'count'
+//   });
+
+//   const mergedData = Object.values(mergedMap).sort((a, b) => {
+//     const aDate = new Date(a._id.year, a._id.month - 1);
+//     const bDate = new Date(b._id.year, b._id.month - 1);
+//     return aDate - bDate;
+//   });
+
+//   return res.status(200).json({
+//     success: true,
+//     data: mergedData,
+//   });
+// });
+
+const getSalesIncomeStats = asyncHandler(async (req, res) => {
+  const { type, startDate } = req.query; // type: 'weekly', 'monthly', 'yearly'
+  if (!type)
+    return res.status(400).json({ message: "Time range is required." });
+
+  const now = new Date();
+  let groupId = {};
+  let start;
+
+  if (type === "weekly") {
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ message: "Start date required for weekly stats" });
+
+    start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    groupId = { $dayOfWeek: "$createdAt" }; // 1 = Sunday
+
+    // Update matchStage below
+  } else if (type === "monthly") {
+    start = new Date(now.getFullYear(), now.getMonth() - 5, 1); // 6 months range
+    groupId = {
+      year: { $year: "$createdAt" },
+      month: { $month: "$createdAt" },
+    };
+  } else if (type === "yearly") {
+    start = new Date(now.getFullYear() - 4, 0, 1); // 5 years range
+    groupId = { year: { $year: "$createdAt" } };
+  }
+
+  const matchStage = {
+    createdAt:
+      type === "weekly"
+        ? {
+            $gte: start,
+            $lte: new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000),
+          }
+        : { $gte: start },
+    status: { $in: ["Delivered", "Completed"] },
+    paymentStatus: "Paid",
+  };
+
+  // 🧾 Aggregation Pipelines
+  const salesIncomeAggregation = [
+    { $match: matchStage },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: groupId,
+        sales: { $sum: "$items.quantity" },
+        income: {
+          $sum: {
+            $multiply: ["$items.quantity", "$items.productSnapshot.price"],
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
+
+  const ordersPaidAggregation = [
+    { $match: matchStage },
+    {
+      $group: {
+        _id: groupId,
+        ordersPaid: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
+
+  const totalVisitorAggregation = [
+    {
+      $match: {
+        createdAt:
+          type === "weekly"
+            ? {
+                $gte: start,
+                $lte: new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000),
+              }
+            : { $gte: start },
+      },
+    },
+    {
+      $group: {
+        _id: groupId,
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
+
+  const [salesIncomeResults, ordersPaidResults, totalVisitorResults] =
+    await Promise.all([
+      Order.aggregate(salesIncomeAggregation),
+      Order.aggregate(ordersPaidAggregation),
+      User.aggregate(totalVisitorAggregation),
+    ]);
+
+  // 🔄 Merge results
+  const mergedMap = {};
+  salesIncomeResults.forEach((item) => {
+    mergedMap[JSON.stringify(item._id)] = {
+      _id: item._id,
+      sales: item.sales,
+      income: item.income,
+    };
+  });
+
+  ordersPaidResults.forEach((item) => {
+    const key = JSON.stringify(item._id);
+    if (!mergedMap[key]) mergedMap[key] = { _id: item._id };
+    mergedMap[key].ordersPaid = item.ordersPaid;
+  });
+
+  totalVisitorResults.forEach((item) => {
+    const key = JSON.stringify(item._id);
+    if (!mergedMap[key]) mergedMap[key] = { _id: item._id };
+    mergedMap[key].visitorCount = item.count;
+  });
+
+  let mergedData = Object.values(mergedMap);
+
+  // Sort mergedData depending on type
+  if (type === "weekly") {
+    mergedData.sort((a, b) => a._id - b._id); // sort by day of week (1–7)
+  } else if (type === "monthly") {
+    mergedData.sort((a, b) => {
+      const aDate = new Date(a._id.year, a._id.month - 1);
+      const bDate = new Date(b._id.year, b._id.month - 1);
+      return aDate - bDate;
+    });
+  } else if (type === "yearly") {
+    mergedData.sort((a, b) => a._id.year - b._id.year);
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: mergedData,
+  });
+});
+
+import { Notification } from "../models/notification.model.js";
+const getAllNotifications = asyncHandler(async (req, res) => {
+  const notifications = await Notification.find().sort({ createdAt: -1 });
+  res.status(200).json({ success: true, data: notifications });
+});
+
+const markNotificationsAsRead = asyncHandler(async (req, res) => {
+  await Notification.updateMany({ isRead: false }, { isRead: true });
+  res
+    .status(200)
+    .json({ success: true, message: "Notifications marked as read" });
+});
+const deleteAllNotifications = asyncHandler(async (req, res) => {
+  const deletedNotifications = await Notification.deleteMany({});
+  res.json({ success: true, deletedNotifications });
+});
+const deleteNotification = asyncHandler(async (req, res) => {
+  const deletedNotification = await Notification.findByIdAndDelete(
+    req.params.id
+  );
+  res.json({ success: true, deletedNotification });
+});
+
 export {
+  getSalesIncomeStats,
+  getOutOfStockProducts,
+  getAllNotifications,
+  markNotificationsAsRead,
+  deleteAllNotifications,
+  deleteNotification,
   checkAuth,
+  getDashboardStats,
+  getTopSellingProducts,
+  getTopVendors,
   adminLoginController,
   logoutAdmin,
   addCategory,
@@ -712,4 +1342,5 @@ export {
   resetPassword,
   sendOtp,
   verifyOtp,
+  handleChatRequest,
 };

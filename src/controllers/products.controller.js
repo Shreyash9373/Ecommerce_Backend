@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadCloudinary } from "../utils/cloudinary.js";
 import { Vendor } from "../models/vendor.model.js";
 import { Product } from "../models/products.model.js";
+import { Notification } from "../models/notification.model.js";
 
 const addProduct = asyncHandler(async (req, res) => {
   try {
@@ -99,6 +100,20 @@ const addProduct = asyncHandler(async (req, res) => {
 
     if (!product) {
       throw new ApiError(500, "Failed to add product");
+    }
+    await Notification.create({
+      message: `Product approval request: "${vendor.name}" has requested to be approve the product  ${product.name}`,
+      type: "request",
+      isRead: false,
+    });
+    console.log("req.io", req.io);
+    if (req.io) {
+      req.io.emit("newNotification", {
+        message: `Product approval request: ${vendor.name} has requested to be approve the product  ${product.name}`,
+        type: "request",
+        isRead: false,
+        createdAt: new Date(),
+      });
     }
 
     if (!addProductinVendor) {

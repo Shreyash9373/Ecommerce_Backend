@@ -29,7 +29,17 @@ import {
   getSearchVendor,
   sendOtp,
   verifyOtp,
+  handleChatRequest,
   checkAuth,
+  getTopSellingProducts,
+  getDashboardStats,
+  getTopVendors,
+  getOutOfStockProducts,
+  getSalesIncomeStats,
+  getAllNotifications,
+  markNotificationsAsRead,
+  deleteAllNotifications,
+  deleteNotification,
 } from "../controllers/admin.controller.js";
 import { verifyJwtAdmin } from "../middlewares/admin.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -95,5 +105,25 @@ router.get("/getUser/:userId", verifyJwtAdmin, getUser);
 //Email Authentication Routes for forgot password
 router.post("/sendOtp", sendOtp);
 router.post("/verifyOtp", verifyOtp);
+
+//Chatbot Routes
+router.post("/chat", verifyJwtAdmin, handleChatRequest);
+router.get("/getTopSellingProducts", verifyJwtAdmin, getTopSellingProducts);
+router.get("/getTopVendors", verifyJwtAdmin, getTopVendors);
+router.get("/getOutOfStockProducts", verifyJwtAdmin, getOutOfStockProducts);
+
+//Dashboard Routes
+router.get("/getDashboardData", verifyJwtAdmin, getDashboardStats);
+router.get("/getSalesIncomeStats", verifyJwtAdmin, getSalesIncomeStats);
+
+//Notification Routes
+router.get("/getAllNotifications", verifyJwtAdmin, getAllNotifications);
+router.put("/markNotificationsAsRead", verifyJwtAdmin, markNotificationsAsRead);
+router.delete(
+  "/deleteAllNotifications",
+  verifyJwtAdmin,
+  deleteAllNotifications
+);
+router.delete("/deleteNotification/:id", verifyJwtAdmin, deleteNotification);
 
 export default router;
