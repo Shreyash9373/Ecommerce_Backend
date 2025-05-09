@@ -34,9 +34,11 @@ const createOrder = asyncHandler(async (req, res) => {
       }
 
       // ✅ Deduct stock
-      await Product.findByIdAndUpdate(productId, {
-        $inc: { stock: -quantity },
-      });
+      if (paymentMethod == "COD") {
+        await Product.findByIdAndUpdate(productId, {
+          $inc: { stock: -quantity },
+        });
+      }
 
       if (product.stock - quantity < 5) {
         const product = await Product.findById(productId);
@@ -95,6 +97,24 @@ const createOrder = asyncHandler(async (req, res) => {
     if (!newOrder) {
       throw new ApiError(500, " Failed to Place Order");
     }
+    // ✅ QR Code Generation (only if UPI payment method selected)
+    let qrImage = null;
+    if (paymentMethod === "UPI") {
+      const vendorIdArray = Array.from(vendorIds); // FIXED
+      const vendor = await Vendor.findById(vendorIdArray[0]);
+
+      if (!vendor) {
+        throw new ApiError(404, `Vendor not found: ${vendorIdArray[0]}`);
+      }
+
+      const upiID = vendor.paymentMethods?.UPI;
+      const upiNote = `Order #${newOrder._id}`;
+      const upiLink = `upi://pay?pa=${upiID}&pn=Shop&tn=${upiNote}&am=${totalAmount}&cu=INR`;
+
+      qrImage = await QRCode.toDataURL(upiLink);
+
+      // console.log("Vendor details: ", upiID, qrImage);
+    }
 
     return res
       .status(201)
@@ -102,6 +122,110 @@ const createOrder = asyncHandler(async (req, res) => {
   } catch (error) {
     next(new ApiError(400, "Error while placing order"));
   }
+});
+const submitPayment = asyncHandler(async (req, res) => {
+  try {
+    const buyerId = req.user._id;
+    let { orderId, payment, transactionId } = req.body;
+
+    if (!payment || !orderId) {
+      throw new ApiError(400, "Payment amount is empty || Order Id is missing");
+    }
+
+    if (!transactionId) {
+      transactionId = orderId;
+    }
+
+    let paymentproofUrl;
+    if (req.files?.paymentProof) {
+      const paymentProofLocalPath = Array.isArray(req.files.paymentProof)
+        ? req.files.paymentProof[0].path
+        : req.files.paymentProof.path;
+
+      if (!paymentProofLocalPath) {
+        throw new ApiError(400, "Invalid payment proof file");
+      }
+
+      const paymentProofUpload = await uploadCloudinary(paymentProofLocalPath, {
+        folder: "Payments",
+      });
+
+      paymentproofUrl = paymentProofUpload?.secure_url;
+    }
+
+    if (!paymentproofUrl) {
+      throw new ApiError(500, "Failed to upload payment proof");
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        "paymentProof.paymentScreenshot": paymentproofUrl,
+        "paymentProof.transactionId": transactionId,
+      },
+      { new: true }
+    );
+
+    // console.log("Order with payment : ", order);
+
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    // ✅ Loop over items and update stock
+    for (const item of order.items) {
+      const { productId, quantity } = item;
+
+      // Deduct stock
+      const product = await Product.findByIdAndUpdate(
+        productId,
+        { $inc: { stock: -quantity } },
+        { new: true }
+      );
+
+      // ✅ If stock falls below threshold, send email
+      if (product && product.stock < 5) {
+        const vendor = await Vendor.findById(product.vendorId);
+        if (vendor && vendor.email) {
+          await sendLowStockEmail(vendor.email, product.name, product.stock);
+        }
+      }
+    }
+
+    return res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          { order, paymentproofUrl },
+          "Payment proof saved and Stock updated Successfully"
+        )
+      );
+  } catch (error) {
+    // console.error("Error in submitPayment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while processing the payment.",
+    });
+  }
+});
+const getUserOrders = asyncHandler(async (req, res) => {
+  const buyerId = req.user._id;
+
+  if (!isValidObjectId(buyerId)) {
+    throw new ApiError(400, "Invalid User id");
+  }
+
+  const orders = await Order.find({ buyerId: buyerId });
+  if (!orders) {
+    throw new ApiError(404, "Vendor not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { orders }, "Vendor details fetched successfully")
+    );
 });
 
 const getVendorOrders = asyncHandler(async (req, res) => {
@@ -137,6 +261,21 @@ const getOrderByStatus = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
 });
+const getVendorOrderByStatus = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+  const { status } = req.query;
+
+  // Use find() to get all products with the given status
+  const orders = await Order.find({ status: status, vendorId: vendorId });
+
+  if (!orders) {
+    throw new ApiError(404, "No orders found with this status");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
+});
 
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id, status } = req.body;
@@ -159,4 +298,12 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, order, "Order status updated"));
 });
 
-export { createOrder, getVendorOrders, getOrderByStatus, updateOrderStatus };
+export {
+  createOrder,
+  submitPayment,
+  getVendorOrders,
+  getVendorOrderByStatus,
+  getOrderByStatus,
+  updateOrderStatus,
+  getUserOrders,
+};
