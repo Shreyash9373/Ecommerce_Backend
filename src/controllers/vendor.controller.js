@@ -348,6 +348,7 @@ const earningOverview = asyncHandler(async (req, res) => {
     {
       $match: {
         vendorId: vendorId, // Automatically matches if vendorId is in the array
+        status: { $nin: ["Cancelled", "Processing", "Pending"] },
       },
     },
     {
@@ -377,6 +378,145 @@ const earningOverview = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, result, "Earnings overview fetched "));
+});
+
+const paymentOverview = asyncHandler(async (req, res) => {
+  const vendorId = req.user._id;
+
+  const summary = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendorId,
+      },
+    },
+    {
+      $facet: {
+        paymentMethods: [
+          {
+            $match: {
+              status: { $nin: ["Cancelled", "Processing", "Pending"] },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              codCount: {
+                $sum: { $cond: [{ $eq: ["$paymentMethod", "COD"] }, 1, 0] },
+              },
+              codAmount: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$paymentMethod", "COD"] },
+                    "$totalAmount",
+                    0,
+                  ],
+                },
+              },
+              upiCount: {
+                $sum: { $cond: [{ $eq: ["$paymentMethod", "UPI"] }, 1, 0] },
+              },
+              upiAmount: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$paymentMethod", "UPI"] },
+                    "$totalAmount",
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ],
+        withdrawableAndPending: [
+          {
+            $group: {
+              _id: null,
+              totalConfirmedSales: {
+                $sum: {
+                  $cond: [
+                    {
+                      $not: [
+                        {
+                          $in: [
+                            "$status",
+                            ["Cancelled", "Processing", "Pending"],
+                          ],
+                        },
+                      ],
+                    },
+                    "$totalAmount",
+                    0,
+                  ],
+                },
+              },
+              pendingOrders: {
+                $sum: {
+                  $cond: [
+                    { $in: ["$status", ["Pending", "Processing"]] },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          {
+            $addFields: {
+              withdrawableBalance: {
+                $subtract: [
+                  "$totalConfirmedSales",
+                  { $multiply: ["$totalConfirmedSales", 0.18] },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        codCount: {
+          $ifNull: [{ $arrayElemAt: ["$paymentMethods.codCount", 0] }, 0],
+        },
+        codAmount: {
+          $ifNull: [{ $arrayElemAt: ["$paymentMethods.codAmount", 0] }, 0],
+        },
+        upiCount: {
+          $ifNull: [{ $arrayElemAt: ["$paymentMethods.upiCount", 0] }, 0],
+        },
+        upiAmount: {
+          $ifNull: [{ $arrayElemAt: ["$paymentMethods.upiAmount", 0] }, 0],
+        },
+        withdrawableBalance: {
+          $ifNull: [
+            {
+              $arrayElemAt: ["$withdrawableAndPending.withdrawableBalance", 0],
+            },
+            0,
+          ],
+        },
+        pendingOrders: {
+          $ifNull: [
+            { $arrayElemAt: ["$withdrawableAndPending.pendingOrders", 0] },
+            0,
+          ],
+        },
+      },
+    },
+  ]);
+
+  const result = summary[0] || {
+    codCount: 0,
+    codAmount: 0,
+    upiCount: 0,
+    upiAmount: 0,
+    withdrawableBalance: 0,
+    pendingOrders: 0,
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Payment overview fetched"));
 });
 
 // Dashboard Controllers
@@ -581,6 +721,7 @@ const vendorInsights = asyncHandler(async (req, res) => {
       $match: {
         vendorId: vendorId,
         createdAt: { $gte: startDate, $lt: endDate },
+        status: { $nin: ["Cancelled", "Pending", "Processing"] },
       },
     },
     {
@@ -844,6 +985,7 @@ export {
   getVendorById,
   resetPassword,
   earningOverview,
+  paymentOverview,
 
   //Dashboard Routes
   getMonthlySales,
