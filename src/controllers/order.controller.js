@@ -35,20 +35,26 @@ const createOrder = asyncHandler(async (req, res) => {
       }
 
       // ✅ Deduct stock
-      // await Product.findByIdAndUpdate(productId, {
-      //   $inc: { stock: -quantity },
-      // });
+      if (paymentMethod == "COD") {
+        await Product.findByIdAndUpdate(productId, {
+          $inc: { stock: -quantity },
+        });
 
-      // if (product.stock - quantity < 5) {
-      //   const product = await Product.findById(productId);
-      //   if (product && product.stock < 5) {
-      //     const vendor = await Vendor.findById(product.vendorId);
-      //     if (vendor && vendor.email) {
-      //       // Send email
-      //       await sendLowStockEmail(vendor.email, product.name, product.stock);
-      //     }
-      //   }
-      // }
+        if (product.stock - quantity < 5) {
+          const product = await Product.findById(productId);
+          if (product && product.stock < 5) {
+            const vendor = await Vendor.findById(product.vendorId);
+            if (vendor && vendor.email) {
+              // Send email
+              await sendLowStockEmail(
+                vendor.email,
+                product.name,
+                product.stock
+              );
+            }
+          }
+        }
+      }
 
       // Store full product details in order
       orderItems.push({
