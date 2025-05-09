@@ -90,8 +90,9 @@ const addProduct = asyncHandler(async (req, res) => {
       tags: parsedTags,
     });
 
+    let addProductinVendor;
     if (product) {
-      const addProductinVendor = await Vendor.findByIdAndUpdate(
+      addProductinVendor = await Vendor.findByIdAndUpdate(
         vendor._id,
         { $push: { products: product._id } },
         { new: true }
