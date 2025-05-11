@@ -213,16 +213,13 @@ const getUserOrders = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid User id");
   }
 
-  const orders = await Order.find({ buyerId: buyerId });
-  if (!orders) {
-    throw new ApiError(404, "Vendor not found");
-  }
+  const orders = await Order.find({ buyerId })
+    .sort({ createdAt: -1 })
+    .lean();
 
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, { orders }, "Vendor details fetched successfully")
-    );
+    .json(new ApiResponse(200, { orders }, "Orders fetched successfully"));
 });
 
 const getVendorOrders = asyncHandler(async (req, res) => {

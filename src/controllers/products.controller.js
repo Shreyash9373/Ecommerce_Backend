@@ -278,72 +278,120 @@ const updateProductById = asyncHandler(async (req, res) => {
 });
 
 const searchProducts = asyncHandler(async (req, res) => {
-  let {
-    search,
-    category,
-    minPrice,
-    maxPrice,
-    sortBy,
-    limit = 10,
-    page = 1,
-  } = req.query;
-  const query = {};
+  try {
+    let {
+      search,
+      category,
+      subCategory,
+      minPrice,
+      maxPrice,
+      sortBy,
+      limit = 20,
+      page = 1,
+    } = req.query;
 
-  // Search by name OR category (case-insensitive)
-  if (search) {
-    query.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { category: { $regex: search, $options: "i" } },
-      { subCategory: { $regex: search, $options: "i" } },
-    ];
+    // Base query - only approved products
+    const query = { status: "approved" };
+
+    // Search by name, category or subCategory
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { subCategory: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Filter by category
+    if (category) {
+      query.category = { $in: category.split(',') };
+    }
+
+    // Filter by subCategory
+    if (subCategory) {
+      query.subCategory = { $in: subCategory.split(',') };
+    }
+
+    // Filter by price range
+    if (minPrice || maxPrice) {
+      query.finalPrice = {};
+      if (minPrice) query.finalPrice.$gte = parseFloat(minPrice);
+      if (maxPrice) query.finalPrice.$lte = parseFloat(maxPrice);
+    }
+
+    // Sorting options
+    let sortOptions = {};
+    if (sortBy === "priceAsc") sortOptions.finalPrice = 1;
+    else if (sortBy === "priceDesc") sortOptions.finalPrice = -1;
+    else if (sortBy === "newest") sortOptions.createdAt = -1;
+    else sortOptions.createdAt = -1; // Default sort
+
+    // Pagination
+    limit = parseInt(limit);
+    page = parseInt(page);
+    const skip = (page - 1) * limit;
+
+    // Fetch products with filters
+    const products = await Product.find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination
+    const totalProducts = await Product.countDocuments(query);
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          totalProducts,
+          page,
+          totalPages: Math.ceil(totalProducts / limit),
+          products,
+        },
+        "Products fetched successfully"
+      )
+    );
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to search products");
   }
+});
 
-  // Filter by category
-  if (category) {
-    query.category = category;
+const getCategories = asyncHandler(async (req, res) => {
+  try {
+    const categories = await Product.distinct("category", { status: "approved" });
+    return res.status(200).json(
+      new ApiResponse(200, categories, "Categories fetched successfully")
+    );
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to fetch categories");
   }
+});
 
-  // Filter by price range
-  if (minPrice || maxPrice) {
-    query.price = {};
-    if (minPrice) query.price.$gte = parseFloat(minPrice);
-    if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+const getSubCategories = asyncHandler(async (req, res) => {
+  try {
+    const { categories } = req.query;
+    const categoryList = categories ? categories.split(',') : [];
+    
+    const query = { status: "approved" };
+    if (categoryList.length > 0) {
+      query.category = { $in: categoryList };
+    }
+
+    const subCategories = await Product.distinct("subCategory", query)
+      .where('subCategory').ne(null).ne('');
+
+    return res.status(200).json(
+      new ApiResponse(200, subCategories, "Subcategories fetched successfully")
+    );
+  } catch (error) {
+    throw new ApiError(500, error.message || "Failed to fetch subcategories");
   }
-
-  // Sorting options
-  let sortOptions = {};
-  if (sortBy === "priceAsc") sortOptions.price = 1;
-  if (sortBy === "priceDesc") sortOptions.price = -1;
-  if (sortBy === "newest") sortOptions.createdAt = -1;
-
-  limit = parseInt(limit);
-  page = parseInt(page);
-  const skip = (page - 1) * limit;
-
-  // Fetch products
-  const products = await Product.find(query)
-    .sort(sortOptions)
-    .skip(skip)
-    .limit(limit);
-
-  // Get total product count
-  const totalProducts = await Product.countDocuments(query);
-
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        totalProducts,
-        page,
-        totalPages: Math.ceil(totalProducts / limit),
-        products,
-      },
-      "Products fetched successfully"
-    )
-  );
 });
 
 export {
+  getCategories,
+  getSubCategories,
   addProduct,
   getAllVendorProducts,
   getProductById,

@@ -33,6 +33,6 @@ router.route("/order-status").get(verifyJwtVendor, getVendorOrderByStatus);
 router.route("/get-OrderStatus").get(getOrderByStatus);
 router.route("/update-OrderStatus").put(verifyJwtVendor, updateOrderStatus);
 
-router.route("/get-UserOrder").put(verifyJwtUser, getUserOrders);
+router.route("/user-orders").get(verifyJwtUser, getUserOrders);
 
 export default router;
