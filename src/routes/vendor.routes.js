@@ -11,6 +11,7 @@ import {
   getVendorById,
   resetPassword,
   earningOverview,
+  paymentOverview,
   getMonthlySales,
   getMonthlyUnitsSold,
   getOrderStatus,
@@ -58,6 +59,7 @@ router.route("/update-vendor").put(
 );
 
 router.route("/earning-overview").get(verifyJwtVendor, earningOverview);
+router.route("/payment-overview").get(verifyJwtVendor, paymentOverview);
 
 // Dashboard Routes
 

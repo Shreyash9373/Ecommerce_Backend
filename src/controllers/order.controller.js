@@ -110,7 +110,7 @@ const createOrder = asyncHandler(async (req, res) => {
         new ApiResponse(201, { newOrder, qrImage }, "Order Places Successfully")
       );
   } catch (error) {
-    console.log("error ", error);
+    // console.log("error ", error);
     res.status(500).json({
       success: false,
 
@@ -162,7 +162,7 @@ const submitPayment = asyncHandler(async (req, res) => {
       { new: true }
     );
 
-    console.log("Order with payment : ", order);
+    // console.log("Order with payment : ", order);
 
     if (!order) {
       throw new ApiError(404, "Order not found");
@@ -198,7 +198,7 @@ const submitPayment = asyncHandler(async (req, res) => {
         )
       );
   } catch (error) {
-    console.error("Error in submitPayment:", error);
+    // console.error("Error in submitPayment:", error);
     res.status(500).json({
       success: false,
       message: "Something went wrong while processing the payment.",
@@ -275,6 +275,8 @@ const getVendorOrderByStatus = asyncHandler(async (req, res) => {
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id, status } = req.body;
 
+  // console.log("OrderStatus Update request: ", id, status);
+
   if (!id || !status) {
     throw new ApiError(400, "Order ID and status are required");
   }
@@ -287,6 +289,8 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   if (!order) {
     throw new ApiError(404, "Order not found");
   }
+
+  // console.log("Order Status update:", order);
 
   return res
     .status(200)
