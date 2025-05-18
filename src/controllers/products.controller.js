@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadCloudinary } from "../utils/cloudinary.js";
 import { Vendor } from "../models/vendor.model.js";
 import { Product } from "../models/products.model.js";
+import { Order } from "../models/orders.model.js";
 
 const addProduct = asyncHandler(async (req, res) => {
   try {
@@ -89,8 +90,9 @@ const addProduct = asyncHandler(async (req, res) => {
       tags: parsedTags,
     });
 
+    let addProductinVendor;
     if (product) {
-      const addProductinVendor = await Vendor.findByIdAndUpdate(
+      addProductinVendor = await Vendor.findByIdAndUpdate(
         vendor._id,
         { $push: { products: product._id } },
         { new: true }
@@ -343,6 +345,85 @@ const searchProducts = asyncHandler(async (req, res) => {
   );
 });
 
+const getMonthlySales = asyncHandler(async (req, res) => {
+  // Get total sales ( money ) of month
+
+  const vendorId = req.user._id;
+  const { productId, month, year } = req.query;
+
+  // JavaScript months are 0-indexed (Jan = 0, Dec = 11)
+
+  //parse month and year
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  const startDate = new Date(yearNum, monthNum - 1, 1); // Start of month
+  const endDate = new Date(yearNum, monthNum, 1); // Start of next month
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  if (!isValidObjectId(vendorId)) {
+    throw new ApiError(400, "Invalid Vendor id");
+  }
+
+  if (!isValidObjectId(productId)) {
+    throw new ApiError(400, "Invalid Product id");
+  }
+
+  const result = await Order.aggregate([
+    {
+      $match: {
+        vendorId: { $in: [vendorId] },
+        createdAt: { $gte: startDate, $lt: endDate },
+        status: { $in: ["Delivered", "Completed"] },
+        "items.productId": new mongoose.Types.ObjectId(productId),
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $match: {
+        "items.productId": new mongoose.Types.ObjectId(productId),
+      },
+    },
+    {
+      $group: {
+        _id: { day: { $dayOfMonth: "$createdAt" } },
+        dailyUnitsSold: { $sum: "$items.quantity" },
+      },
+    },
+    { $sort: { "_id.day": 1 } },
+  ]);
+
+  const product = await Product.findById(productId).select(
+    "stock name image averageRating"
+  );
+
+  const labels = [];
+  const data = [];
+  let totalUnitsSold = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const match = result.find((d) => d._id.day === day);
+    const units = match ? match.dailyUnitsSold : 0;
+    data.push(units);
+    labels.push(
+      `${startDate.toLocaleString("default", {
+        month: "short",
+      })} ${day}`
+    );
+    totalUnitsSold += units;
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { totalUnitsSold, labels, data, product },
+        "Monthly Sales fetched successfully"
+      )
+    );
+});
+
 export {
   addProduct,
   getAllVendorProducts,
@@ -351,4 +432,5 @@ export {
   updateProductById,
   getAllApprovedProducts,
   searchProducts,
+  getMonthlySales,
 };

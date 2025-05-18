@@ -9,6 +9,7 @@ import {
   updateProductById,
   getAllApprovedProducts,
   searchProducts,
+  getMonthlySales,
 } from "../controllers/products.controller.js";
 import { verifyJwtUser } from "../middlewares/user.middleware.js";
 import verifyJwtVendorOrAdmin from "../middlewares/adminorvendor.middleware.js";
@@ -49,5 +50,7 @@ router.route("/get-approvedProducts").get(getAllApprovedProducts);
 router
   .route("/delete-product/:productId")
   .delete(verifyJwtVendor, deleteProductById);
+
+router.route("/product-analytic").get(verifyJwtVendor, getMonthlySales);
 
 export default router;

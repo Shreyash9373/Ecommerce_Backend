@@ -632,6 +632,8 @@ const getUser = asyncHandler(async (req, res) => {
 const otpStorage = {};
 const sendOtp = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  console.log("emal:", email);
+
   if (!email) {
     return new ApiError(404, "Email is required");
   }
@@ -639,6 +641,8 @@ const sendOtp = asyncHandler(async (req, res) => {
   const otp = Math.floor(1000 + Math.random() * 900000).toString();
   otpStorage[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
   try {
+    console.log("otpstorr:", otpStorage);
+
     await sendOtpEmail(email, otp);
     return res
       .status(200)
@@ -653,7 +657,9 @@ const sendOtp = asyncHandler(async (req, res) => {
 
 const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
+  console.log("ee and otp:", email, otp);
 
+  console.log("otpstore", otpStorage);
   if (!otpStorage[email]) {
     return res.status(400).json({ error: "OTP expired or invalid" });
   }
