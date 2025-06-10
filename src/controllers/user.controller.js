@@ -394,6 +394,40 @@ const setDefaultAddress = asyncHandler(async (req, res) => {
   }
 });
 
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, password, confirmPassword } = req.body;
+
+  if (!email || !password || !confirmPassword) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  if (password !== confirmPassword) {
+    throw new ApiError(400, "Password and Confirm Password do not match");
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // Set new password & save (Triggers pre-save hashing)
+  user.password = password;
+  await user.save();
+
+  // Remove sensitive fields before sending response
+  const sanitizedUser = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt,
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, sanitizedUser, "Password Changed Successfully"));
+});
+
 // const getUserWithAddresses = asyncHandler(async (req, res) => {
 //   try {
 //     const user = await User.findById(req.user._id).select('-password -refreshToken');
@@ -424,6 +458,7 @@ export {
   updateAddress,
   deleteAddress,
   setDefaultAddress,
+  resetPassword,
  // getUserWithAddresses,
 };
 // Add to the exports
